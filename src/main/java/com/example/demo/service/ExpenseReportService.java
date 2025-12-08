@@ -3,13 +3,17 @@ package com.example.demo.service;
 import com.example.demo.domain.ExpenseItem;
 import com.example.demo.domain.ExpenseReport;
 import com.example.demo.domain.User;
+import com.example.demo.dto.ExpenseItemResponse;
 import com.example.demo.dto.ExpenseReportCreateRequest;
+import com.example.demo.dto.ExpenseReportListItemResponse;
+import com.example.demo.dto.ExpenseReportResponse;
 import com.example.demo.repository.ExpenseReportRepository;
 import com.example.demo.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -59,5 +63,58 @@ public class ExpenseReportService {
         ExpenseReport saved = expenseReportRepository.save(report);
 
         return saved.getId();
+    }
+
+    // ✅ 1) 특정 사용자의 보고서 목록
+    public List<ExpenseReportListItemResponse> getReportsBySubmitter (Long submitterId){
+        List<ExpenseReport> reports =
+                expenseReportRepository.findBySubmitterId(submitterId);
+
+        return reports.stream()
+                .map(r -> ExpenseReportListItemResponse.builder()
+                        .id(r.getId())
+                        .title(r.getTitle())
+                        .totalAmount(r.getTotalAmount())
+                        .status(r.getStatus())
+                        .destination(r.getDestination())
+                        .departureDate(r.getDepartureDate())
+                        .returnDate(r.getReturnDate())
+                        .build()
+                )
+                .toList();
+    }
+
+    // ✅ 2) 단일 보고서 상세
+    public ExpenseReportResponse getReport (Long id){
+        ExpenseReport r = expenseReportRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Report not found: " + id));
+
+        return ExpenseReportResponse.builder()
+                .id(r.getId())
+                .title(r.getTitle())
+                .totalAmount(r.getTotalAmount())
+                .status(r.getStatus())
+                .destination(r.getDestination())
+                .departureDate(r.getDepartureDate())
+                .returnDate(r.getReturnDate())
+                .createdAt(r.getCreatedAt())
+                .approvedAt(r.getApprovedAt())
+                .submitterId(r.getSubmitter() != null ? r.getSubmitter().getId() : null)
+                .submitterName(r.getSubmitter() != null ? r.getSubmitter().getName() : null)
+                .approverId(r.getApprover() != null ? r.getApprover().getId() : null)
+                .approverName(r.getApprover() != null ? r.getApprover().getName() : null)
+                .items(
+                        r.getItems().stream()
+                                .map(i -> ExpenseItemResponse.builder()
+                                        .id(i.getId())
+                                        .date(i.getDate())
+                                        .description(i.getDescription())
+                                        .amount(i.getAmount())
+                                        .category(i.getCategory())
+                                        .build()
+                                )
+                                .toList()
+                )
+                .build();
     }
 }

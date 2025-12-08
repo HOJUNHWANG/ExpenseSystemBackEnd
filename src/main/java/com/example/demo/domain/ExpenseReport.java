@@ -3,6 +3,7 @@ package com.example.demo.domain;
 import jakarta.persistence.*;
 import lombok.*;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -28,8 +29,18 @@ public class ExpenseReport {
 
     private String status;             // Status: DRAFT, SUBMITTED, APPROVED etc...
 
+    private String destination;
+
+    private LocalDate departureDate;
+    private LocalDate returnDate;
+
+    private LocalDateTime approvedAt;
+
     @ManyToOne(fetch = FetchType.LAZY)
     private User submitter;            // Submitter (User)
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    private User approver;
 
     @OneToMany(mappedBy = "expenseReport",
             cascade = CascadeType.ALL,

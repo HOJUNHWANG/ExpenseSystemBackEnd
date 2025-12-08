@@ -34,5 +34,8 @@ public class ExpenseReport {
     @OneToMany(mappedBy = "expenseReport",
             cascade = CascadeType.ALL,
             orphanRemoval = true)
+
+    @Builder.Default
+
     private List<ExpenseItem> items = new ArrayList<>();
 }

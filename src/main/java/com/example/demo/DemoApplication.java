@@ -40,7 +40,7 @@ public class DemoApplication {
 
 			// 2) ExpenseReport + ExpenseItem 더미 데이터 생성 (한 번만)
 			if (expenseReportRepository.count() == 0) {
-				ExpenseItem taxi = ExpenseItem.builder()
+				ExpenseItem uber = ExpenseItem.builder()
 						.date(LocalDate.now())
 						.description("Uber to Airport")
 						.amount(35.67)
@@ -62,11 +62,11 @@ public class DemoApplication {
 						.build();
 
 				// 양방향 연결
-				taxi.setExpenseReport(report);
+				uber.setExpenseReport(report);
 				meal.setExpenseReport(report);
 
-				report.getItems().addAll(List.of(taxi, meal));
-				report.setTotalAmount(taxi.getAmount() + meal.getAmount());
+				report.getItems().addAll(List.of(uber, meal));
+				report.setTotalAmount(uber.getAmount() + meal.getAmount());
 
 				ExpenseReport saved = expenseReportRepository.save(report);
 				System.out.println("👉 Sample ExpenseReport saved: id=" + saved.getId());

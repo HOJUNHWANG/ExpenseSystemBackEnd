@@ -36,6 +36,8 @@ public class ExpenseReport {
 
     private LocalDateTime approvedAt;
 
+    private String approvalComment;
+
     @ManyToOne(fetch = FetchType.LAZY)
     private User submitter;            // Submitter (User)
 

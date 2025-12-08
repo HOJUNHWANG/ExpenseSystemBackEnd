@@ -3,6 +3,7 @@ package com.example.demo.controller;
 import com.example.demo.dto.ExpenseReportCreateRequest;
 import com.example.demo.dto.ExpenseReportListItemResponse;
 import com.example.demo.dto.ExpenseReportResponse;
+import com.example.demo.dto.ApprovalRequest;
 import com.example.demo.service.ExpenseReportService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -37,6 +38,28 @@ public class ExpenseReportController {
     public ResponseEntity<ExpenseReportResponse> getOne(@PathVariable Long id) {
         var result = expenseReportService.getReport(id);
         return ResponseEntity.ok(result);
+    }
+
+    // ✅ 승인 API
+    // POST /api/expense-reports/{id}/approve
+    @PostMapping("/{id}/approve")
+    public ResponseEntity<Void> approve(
+            @PathVariable Long id,
+            @RequestBody ApprovalRequest request
+    ) {
+        expenseReportService.approveReport(id, request);
+        return ResponseEntity.ok().build();
+    }
+
+    // ✅ 반려 API
+    // POST /api/expense-reports/{id}/reject
+    @PostMapping("/{id}/reject")
+    public ResponseEntity<Void> reject(
+            @PathVariable Long id,
+            @RequestBody ApprovalRequest request
+    ) {
+        expenseReportService.rejectReport(id, request);
+        return ResponseEntity.ok().build();
     }
 
 }

@@ -7,6 +7,7 @@ import com.example.demo.dto.ExpenseItemResponse;
 import com.example.demo.dto.ExpenseReportCreateRequest;
 import com.example.demo.dto.ExpenseReportListItemResponse;
 import com.example.demo.dto.ExpenseReportResponse;
+import com.example.demo.dto.ApprovalRequest;
 import com.example.demo.repository.ExpenseReportRepository;
 import com.example.demo.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -117,4 +118,46 @@ public class ExpenseReportService {
                 )
                 .build();
     }
+
+    // ✅ 승인
+    public void approveReport(Long reportId, ApprovalRequest req) {
+        ExpenseReport report = expenseReportRepository.findById(reportId)
+                .orElseThrow(() -> new IllegalArgumentException("Report not found: " + reportId));
+
+        User approver = userRepository.findById(req.getApproverId())
+                .orElseThrow(() -> new IllegalArgumentException("Approver not found: " + req.getApproverId()));
+
+        // 간단한 상태 체크 (원하면 더 엄격하게)
+        if (!"SUBMITTED".equals(report.getStatus())) {
+            throw new IllegalStateException("Only SUBMITTED reports can be approved.");
+        }
+
+        report.setStatus("APPROVED");
+        report.setApprover(approver);
+        report.setApprovedAt(LocalDateTime.now());
+        report.setApprovalComment(req.getComment());
+
+        expenseReportRepository.save(report);
+    }
+
+    // ✅ 반려
+    public void rejectReport(Long reportId, ApprovalRequest req) {
+        ExpenseReport report = expenseReportRepository.findById(reportId)
+                .orElseThrow(() -> new IllegalArgumentException("Report not found: " + reportId));
+
+        User approver = userRepository.findById(req.getApproverId())
+                .orElseThrow(() -> new IllegalArgumentException("Approver not found: " + req.getApproverId()));
+
+        if (!"SUBMITTED".equals(report.getStatus())) {
+            throw new IllegalStateException("Only SUBMITTED reports can be rejected.");
+        }
+
+        report.setStatus("REJECTED");
+        report.setApprover(approver);
+        report.setApprovedAt(LocalDateTime.now()); // 반려도 처리일자 기록
+        report.setApprovalComment(req.getComment());
+
+        expenseReportRepository.save(report);
+    }
+
 }

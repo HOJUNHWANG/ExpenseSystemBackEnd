@@ -1,7 +1,5 @@
 package com.example.demo;
 
-import com.example.demo.domain.ExpenseItem;
-import com.example.demo.domain.ExpenseReport;
 import com.example.demo.domain.User;
 import com.example.demo.repository.ExpenseReportRepository;
 import com.example.demo.repository.UserRepository;
@@ -9,10 +7,6 @@ import org.springframework.boot.CommandLineRunner;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.context.annotation.Bean;
-
-import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.util.List;
 
 @SpringBootApplication
 public class DemoApplication {

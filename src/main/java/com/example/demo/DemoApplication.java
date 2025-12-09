@@ -25,51 +25,33 @@ public class DemoApplication {
 	public CommandLineRunner initData(UserRepository userRepository,
 									  ExpenseReportRepository expenseReportRepository) {
 		return args -> {
+			if (userRepository.count() == 0) {
 
-			// 1) User 생성 (기존과 동일)
-			User user = userRepository.findAll().stream().findFirst()
-					.orElseGet(() -> userRepository.save(
-							User.builder()
-									.name("Jun")
-									.email("jun@example.com")
-									.role("EMPLOYEE")
-									.build()
-					));
-
-			System.out.println("👉 User id = " + user.getId());
-
-			// 2) ExpenseReport + ExpenseItem 더미 데이터 생성 (한 번만)
-			if (expenseReportRepository.count() == 0) {
-				ExpenseItem uber = ExpenseItem.builder()
-						.date(LocalDate.now())
-						.description("Uber to Airport")
-						.amount(35.67)
-						.category("Transportation")
+				// 1) Test용 User 생성 (기존과 동일)
+				User employee = User.builder()
+						.name("Jun Employee")
+						.email("jun@example.com")
+						.role("EMPLOYEE")
 						.build();
 
-				ExpenseItem meal = ExpenseItem.builder()
-						.date(LocalDate.now())
-						.description("Lunch")
-						.amount(22.74)
-						.category("Meal")
+				User manager = User.builder()
+						.name("Manager Kim")
+						.email("manager@example.com")
+						.role("MANAGER")
 						.build();
 
-				ExpenseReport report = ExpenseReport.builder()
-						.title("December Expense Report")
-						.createdAt(LocalDateTime.now())
-						.status("SUBMITTED")
-						.submitter(user)
+				User finance = User.builder()
+						.name("Finance Lee")
+						.email("finance@example.com")
+						.role("FINANCE")
 						.build();
 
-				// 양방향 연결
-				uber.setExpenseReport(report);
-				meal.setExpenseReport(report);
+				userRepository.save(employee);
+				userRepository.save(manager);
+				userRepository.save(finance);
 
-				report.getItems().addAll(List.of(uber, meal));
-				report.setTotalAmount(uber.getAmount() + meal.getAmount());
+				System.out.println("👉 Seed users created.");
 
-				ExpenseReport saved = expenseReportRepository.save(report);
-				System.out.println("👉 Sample ExpenseReport saved: id=" + saved.getId());
 			}
 		};
 	}

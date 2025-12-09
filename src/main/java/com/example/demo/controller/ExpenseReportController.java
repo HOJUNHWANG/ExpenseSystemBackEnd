@@ -43,23 +43,31 @@ public class ExpenseReportController {
     // ✅ 승인 API
     // POST /api/expense-reports/{id}/approve
     @PostMapping("/{id}/approve")
-    public ResponseEntity<Void> approve(
+    public ResponseEntity<?> approve(
             @PathVariable Long id,
             @RequestBody ApprovalRequest request
     ) {
-        expenseReportService.approveReport(id, request);
-        return ResponseEntity.ok().build();
+        try {
+            expenseReportService.approveReport(id, request);
+            return ResponseEntity.ok().build();
+        } catch (IllegalArgumentException | IllegalStateException e) {
+            // 400 Bad Request + 에러 메시지 문자열
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
     }
 
     // ✅ 반려 API
     // POST /api/expense-reports/{id}/reject
     @PostMapping("/{id}/reject")
-    public ResponseEntity<Void> reject(
+    public ResponseEntity<?> reject(
             @PathVariable Long id,
             @RequestBody ApprovalRequest request
     ) {
-        expenseReportService.rejectReport(id, request);
-        return ResponseEntity.ok().build();
+        try {
+            expenseReportService.rejectReport(id, request);
+            return ResponseEntity.ok().build();
+        } catch (IllegalArgumentException | IllegalStateException e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
     }
-
 }

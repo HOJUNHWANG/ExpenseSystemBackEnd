@@ -27,6 +27,7 @@ public class ExpenseReport {
 
     private double totalAmount;           // Total Amount
 
+    @Enumerated(EnumType.STRING)
     private String status;             // Status: DRAFT, SUBMITTED, APPROVED etc...
 
     private String destination;
@@ -49,6 +50,5 @@ public class ExpenseReport {
             orphanRemoval = true)
 
     @Builder.Default
-
     private List<ExpenseItem> items = new ArrayList<>();
 }

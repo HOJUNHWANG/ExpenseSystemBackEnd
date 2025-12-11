@@ -1,5 +1,6 @@
 package com.example.demo.controller;
 
+import com.example.demo.domain.ExpenseReportStatus;
 import com.example.demo.dto.ExpenseReportCreateRequest;
 import com.example.demo.dto.ExpenseReportListItemResponse;
 import com.example.demo.dto.ExpenseReportResponse;
@@ -24,13 +25,19 @@ public class ExpenseReportController {
         return ResponseEntity.ok(id);
     }
 
-    // ✅ 1) 목록 조회: /api/expense-reports?submitterId=1
+    // ExpenseReportController.java
     @GetMapping
-    public ResponseEntity<List<ExpenseReportListItemResponse>> list(
-            @RequestParam Long submitterId) {
-
-        var result = expenseReportService.getReportsBySubmitter(submitterId);
-        return ResponseEntity.ok(result);
+    public List<ExpenseReportListItemResponse> list(
+            @RequestParam Long submitterId,
+            @RequestParam(required = false) String status
+    ) {
+        if (status == null || status.isBlank()) {
+            // 기존 전체
+            return expenseReportService.getReportsBySubmitter(submitterId);
+        } else {
+            ExpenseReportStatus s = ExpenseReportStatus.valueOf(status.toUpperCase());
+            return expenseReportService.findBySubmitterAndStatus(submitterId, s);
+        }
     }
 
     // ✅ 2) 상세 조회: /api/expense-reports/{id}

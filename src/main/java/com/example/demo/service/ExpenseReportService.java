@@ -2,6 +2,7 @@ package com.example.demo.service;
 
 import com.example.demo.domain.ExpenseItem;
 import com.example.demo.domain.ExpenseReport;
+import com.example.demo.domain.ExpenseReportStatus;
 import com.example.demo.domain.User;
 import com.example.demo.dto.ExpenseItemResponse;
 import com.example.demo.dto.ExpenseReportCreateRequest;
@@ -10,6 +11,8 @@ import com.example.demo.dto.ExpenseReportResponse;
 import com.example.demo.dto.ApprovalRequest;
 import com.example.demo.repository.ExpenseReportRepository;
 import com.example.demo.repository.UserRepository;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -33,9 +36,10 @@ public class ExpenseReportService {
         ExpenseReport report = ExpenseReport.builder()
                 .title(request.getTitle())
                 .createdAt(LocalDateTime.now())
-                .status("SUBMITTED")
                 .submitter(submitter)
                 .build();
+
+        report.setStatus(String.valueOf(ExpenseReportStatus.SUBMITTED));
 
         // @Builder.Default 덕분에 items 리스트는 이미 new ArrayList<>() 상태라고 가정
         double total = 0;
@@ -132,7 +136,7 @@ public class ExpenseReportService {
             throw new IllegalStateException("Only SUBMITTED reports can be approved.");
         }
 
-        report.setStatus("APPROVED");
+        report.setStatus(String.valueOf(ExpenseReportStatus.APPROVED));
         report.setApprover(approver);
         report.setApprovedAt(LocalDateTime.now());
         report.setApprovalComment(req.getComment());
@@ -152,7 +156,7 @@ public class ExpenseReportService {
             throw new IllegalStateException("Only SUBMITTED reports can be rejected.");
         }
 
-        report.setStatus("REJECTED");
+        report.setStatus(String.valueOf(ExpenseReportStatus.REJECTED));
         report.setApprover(approver);
         report.setApprovedAt(LocalDateTime.now()); // 반려도 처리일자 기록
         report.setApprovalComment(req.getComment());

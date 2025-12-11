@@ -27,17 +27,24 @@ public class ExpenseReportController {
 
     // ExpenseReportController.java
     @GetMapping
-    public List<ExpenseReportListItemResponse> list(
+    public ResponseEntity<List<ExpenseReportListItemResponse>> list(
             @RequestParam Long submitterId,
             @RequestParam(required = false) String status
     ) {
         if (status == null || status.isBlank()) {
-            // 기존 전체
-            return expenseReportService.getReportsBySubmitter(submitterId);
+            return ResponseEntity.ok(expenseReportService.getReportsBySubmitter(submitterId));
         } else {
             ExpenseReportStatus s = ExpenseReportStatus.valueOf(status.toUpperCase());
-            return expenseReportService.findBySubmitterAndStatus(submitterId, s);
+            return ResponseEntity.ok(
+                    expenseReportService.findBySubmitterAndStatus(submitterId, s)
+            );
         }
+    }
+
+    // 🔹 새로 추가: 승인 대기중 목록 (Manager용)
+    @GetMapping("/pending-approval")
+    public ResponseEntity<List<ExpenseReportListItemResponse>> listPendingApproval() {
+        return ResponseEntity.ok(expenseReportService.getReportsPendingApproval());
     }
 
     // ✅ 2) 상세 조회: /api/expense-reports/{id}

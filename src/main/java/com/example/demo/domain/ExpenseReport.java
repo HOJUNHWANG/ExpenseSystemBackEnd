@@ -28,7 +28,7 @@ public class ExpenseReport {
     private double totalAmount;           // Total Amount
 
     @Enumerated(EnumType.STRING)
-    private String status;             // Status: DRAFT, SUBMITTED, APPROVED etc...
+    private ExpenseReportStatus status;             // Status: DRAFT, SUBMITTED, APPROVED etc...
 
     private String destination;
 

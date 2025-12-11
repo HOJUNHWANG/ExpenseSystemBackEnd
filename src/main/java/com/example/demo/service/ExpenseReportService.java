@@ -144,6 +144,24 @@ public class ExpenseReportService {
                 .toList();
     }
 
+    public List<ExpenseReportListItemResponse> getReportsPendingApproval() {
+        List<ExpenseReport> reports =
+                expenseReportRepository.findByStatus(ExpenseReportStatus.SUBMITTED);
+
+        return reports.stream()
+                .map(r -> ExpenseReportListItemResponse.builder()
+                        .id(r.getId())
+                        .title(r.getTitle())
+                        .totalAmount(r.getTotalAmount())
+                        .status(r.getStatus().name())
+                        .destination(r.getDestination())
+                        .departureDate(r.getDepartureDate())
+                        .returnDate(r.getReturnDate())
+                        .build()
+                )
+                .toList();
+    }
+
     // ✅ 승인
     public void approveReport(Long reportId, ApprovalRequest req) {
         ExpenseReport report = expenseReportRepository.findById(reportId)

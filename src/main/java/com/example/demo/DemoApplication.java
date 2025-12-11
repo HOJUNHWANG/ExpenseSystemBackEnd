@@ -1,7 +1,6 @@
 package com.example.demo;
 
 import com.example.demo.domain.User;
-import com.example.demo.repository.ExpenseReportRepository;
 import com.example.demo.repository.UserRepository;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.boot.SpringApplication;
@@ -16,8 +15,7 @@ public class DemoApplication {
 	}
 
 	@Bean
-	public CommandLineRunner initData(UserRepository userRepository,
-									  ExpenseReportRepository expenseReportRepository) {
+	public CommandLineRunner initData(UserRepository userRepository) {
 		return args -> {
 			if (userRepository.count() == 0) {
 

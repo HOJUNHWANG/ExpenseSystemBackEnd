@@ -11,8 +11,6 @@ import com.example.demo.dto.ExpenseReportResponse;
 import com.example.demo.dto.ApprovalRequest;
 import com.example.demo.repository.ExpenseReportRepository;
 import com.example.demo.repository.UserRepository;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -121,6 +119,29 @@ public class ExpenseReportService {
                                 .toList()
                 )
                 .build();
+    }
+
+    // ExpenseReportService.java 파일에 추가할 내용
+
+    // ✅ 3) 특정 사용자의 특정 상태 보고서 목록
+    public List<ExpenseReportListItemResponse> findBySubmitterAndStatus(Long submitterId, ExpenseReportStatus status) {
+        // Repository에 findBySubmitterIdAndStatus라는 메서드가 정의되어 있다고 가정합니다.
+        List<ExpenseReport> reports =
+                expenseReportRepository.findBySubmitterIdAndStatus(submitterId, status);
+
+        // DTO 변환 로직은 getReportsBySubmitter와 동일합니다.
+        return reports.stream()
+                .map(r -> ExpenseReportListItemResponse.builder()
+                        .id(r.getId())
+                        .title(r.getTitle())
+                        .totalAmount(r.getTotalAmount())
+                        .status(r.getStatus())
+                        .destination(r.getDestination())
+                        .departureDate(r.getDepartureDate())
+                        .returnDate(r.getReturnDate())
+                        .build()
+                )
+                .toList();
     }
 
     // ✅ 승인

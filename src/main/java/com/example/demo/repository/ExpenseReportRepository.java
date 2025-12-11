@@ -11,4 +11,5 @@ public interface ExpenseReportRepository extends JpaRepository<ExpenseReport, Lo
     // For searching the report that submitted by certain User
     List<ExpenseReport> findBySubmitterId(Long submitterId);
     List<ExpenseReport> findBySubmitterIdAndStatus(Long submitterId, ExpenseReportStatus status);
+    List<ExpenseReport> findByStatus(ExpenseReportStatus status);
 }

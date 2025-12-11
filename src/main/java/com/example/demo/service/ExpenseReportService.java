@@ -37,7 +37,7 @@ public class ExpenseReportService {
                 .submitter(submitter)
                 .build();
 
-        report.setStatus(String.valueOf(ExpenseReportStatus.SUBMITTED));
+        report.setStatus(ExpenseReportStatus.SUBMITTED);
 
         // @Builder.Default 덕분에 items 리스트는 이미 new ArrayList<>() 상태라고 가정
         double total = 0;
@@ -78,7 +78,7 @@ public class ExpenseReportService {
                         .id(r.getId())
                         .title(r.getTitle())
                         .totalAmount(r.getTotalAmount())
-                        .status(r.getStatus())
+                        .status(r.getStatus().name())
                         .destination(r.getDestination())
                         .departureDate(r.getDepartureDate())
                         .returnDate(r.getReturnDate())
@@ -96,7 +96,7 @@ public class ExpenseReportService {
                 .id(r.getId())
                 .title(r.getTitle())
                 .totalAmount(r.getTotalAmount())
-                .status(r.getStatus())
+                .status(r.getStatus().name())
                 .destination(r.getDestination())
                 .departureDate(r.getDepartureDate())
                 .returnDate(r.getReturnDate())
@@ -135,7 +135,7 @@ public class ExpenseReportService {
                         .id(r.getId())
                         .title(r.getTitle())
                         .totalAmount(r.getTotalAmount())
-                        .status(r.getStatus())
+                        .status(r.getStatus().name())
                         .destination(r.getDestination())
                         .departureDate(r.getDepartureDate())
                         .returnDate(r.getReturnDate())
@@ -153,11 +153,11 @@ public class ExpenseReportService {
                 .orElseThrow(() -> new IllegalArgumentException("Approver not found: " + req.getApproverId()));
 
         // 간단한 상태 체크 (원하면 더 엄격하게)
-        if (!"SUBMITTED".equals(report.getStatus())) {
-            throw new IllegalStateException("Only SUBMITTED reports can be approved.");
+        if (report.getStatus() != ExpenseReportStatus.SUBMITTED) {
+            throw new IllegalStateException("Only SUBMITTED status reports can be approved.");
         }
 
-        report.setStatus(String.valueOf(ExpenseReportStatus.APPROVED));
+        report.setStatus(ExpenseReportStatus.APPROVED);
         report.setApprover(approver);
         report.setApprovedAt(LocalDateTime.now());
         report.setApprovalComment(req.getComment());
@@ -173,11 +173,11 @@ public class ExpenseReportService {
         User approver = userRepository.findById(req.getApproverId())
                 .orElseThrow(() -> new IllegalArgumentException("Approver not found: " + req.getApproverId()));
 
-        if (!"SUBMITTED".equals(report.getStatus())) {
-            throw new IllegalStateException("Only SUBMITTED reports can be rejected.");
+        if (report.getStatus() != ExpenseReportStatus.SUBMITTED) {
+            throw new IllegalStateException("Only SUBMITTED status reports can be rejected.");
         }
 
-        report.setStatus(String.valueOf(ExpenseReportStatus.REJECTED));
+        report.setStatus(ExpenseReportStatus.REJECTED);
         report.setApprover(approver);
         report.setApprovedAt(LocalDateTime.now()); // 반려도 처리일자 기록
         report.setApprovalComment(req.getComment());

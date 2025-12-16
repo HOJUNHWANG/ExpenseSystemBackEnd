@@ -170,6 +170,10 @@ public class ExpenseReportService {
         User approver = userRepository.findById(req.getApproverId())
                 .orElseThrow(() -> new IllegalArgumentException("Approver not found: " + req.getApproverId()));
 
+        if (report.getSubmitter().equals(approver)) {
+            throw new IllegalStateException("You cannot approve/reject your own report.");
+        }
+
         // 간단한 상태 체크 (원하면 더 엄격하게)
         if (report.getStatus() != ExpenseReportStatus.SUBMITTED) {
             throw new IllegalStateException("Only SUBMITTED status reports can be approved.");
@@ -190,6 +194,10 @@ public class ExpenseReportService {
 
         User approver = userRepository.findById(req.getApproverId())
                 .orElseThrow(() -> new IllegalArgumentException("Approver not found: " + req.getApproverId()));
+
+        if (report.getSubmitter().equals(approver)) {
+            throw new IllegalStateException("You cannot approve/reject your own report.");
+        }
 
         if (report.getStatus() != ExpenseReportStatus.SUBMITTED) {
             throw new IllegalStateException("Only SUBMITTED status reports can be rejected.");

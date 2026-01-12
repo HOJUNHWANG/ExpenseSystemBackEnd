@@ -30,5 +30,7 @@ public class ExpenseReportResponse {
     private Long approverId;
     private String approverName;
 
+    private String comment;
+
     private List<ExpenseItemResponse> items;
 }

@@ -162,7 +162,7 @@ public class ExpenseReportService {
                 .toList();
     }
 
-    // ✅ 승인
+    // Approved
     public void approveReport(Long reportId, ApprovalRequest req) {
         ExpenseReport report = expenseReportRepository.findById(reportId)
                 .orElseThrow(() -> new IllegalArgumentException("Report not found: " + reportId));
@@ -187,7 +187,7 @@ public class ExpenseReportService {
         expenseReportRepository.save(report);
     }
 
-    // ✅ 반려
+    // Reject
     public void rejectReport(Long reportId, ApprovalRequest req) {
         ExpenseReport report = expenseReportRepository.findById(reportId)
                 .orElseThrow(() -> new IllegalArgumentException("Report not found: " + reportId));

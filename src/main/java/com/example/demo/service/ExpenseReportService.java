@@ -106,6 +106,7 @@ public class ExpenseReportService {
                 .submitterName(r.getSubmitter() != null ? r.getSubmitter().getName() : null)
                 .approverId(r.getApprover() != null ? r.getApprover().getId() : null)
                 .approverName(r.getApprover() != null ? r.getApprover().getName() : null)
+                .approvalComment(r.getApprovalComment())
                 .items(
                         r.getItems().stream()
                                 .map(i -> ExpenseItemResponse.builder()

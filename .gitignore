@@ -31,3 +31,8 @@ build/
 
 ### VS Code ###
 .vscode/
+
+# Ignore local H2 files
+data/
+*.db
+*.lock.db

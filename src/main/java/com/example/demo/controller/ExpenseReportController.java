@@ -47,6 +47,29 @@ public class ExpenseReportController {
         return ResponseEntity.ok(expenseReportService.getReportsPendingApproval());
     }
 
+    // Submit (routes to SUBMITTED or FINANCE_SPECIAL_REVIEW)
+    @PostMapping("/{id}/submit")
+    public ResponseEntity<String> submit(@PathVariable Long id, @RequestBody com.example.demo.dto.SubmitRequest req) {
+        var st = expenseReportService.submitReport(id, req);
+        return ResponseEntity.ok(st.name());
+    }
+
+    // Finance: view special review details
+    @GetMapping("/{id}/special-review")
+    public ResponseEntity<com.example.demo.dto.SpecialReviewResponse> getSpecialReview(@PathVariable Long id) {
+        return ResponseEntity.ok(expenseReportService.getSpecialReview(id));
+    }
+
+    // Finance: decide special review (approve/reject per item)
+    @PostMapping("/{id}/special-review/decide")
+    public ResponseEntity<String> decideSpecialReview(
+            @PathVariable Long id,
+            @RequestBody com.example.demo.dto.SpecialReviewDecisionRequest req
+    ) {
+        var st = expenseReportService.decideSpecialReview(id, req);
+        return ResponseEntity.ok(st.name());
+    }
+
     /**
      * Demo-friendly search.
      *

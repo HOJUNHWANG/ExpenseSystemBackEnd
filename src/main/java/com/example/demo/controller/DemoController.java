@@ -16,7 +16,13 @@ public class DemoController {
 
     @PostMapping("/reset")
     public ResponseEntity<String> reset() {
-        demoDataService.resetAndSeed();
-        return ResponseEntity.ok("OK");
+        try {
+            demoDataService.resetAndSeed();
+            return ResponseEntity.ok("OK");
+        } catch (Exception e) {
+            // Log for Render logs; return a safe message to the client.
+            e.printStackTrace();
+            return ResponseEntity.status(500).body("Demo reset failed");
+        }
     }
 }

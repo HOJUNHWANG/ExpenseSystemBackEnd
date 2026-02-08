@@ -19,11 +19,14 @@ import java.util.List;
 public class DemoDataService {
 
     private final ExpenseReportRepository expenseReportRepository;
+    private final com.example.demo.repository.ExpenseItemRepository expenseItemRepository;
     private final UserRepository userRepository;
 
     @Transactional
     public void resetAndSeed() {
-        // delete reports first (items cascade + orphanRemoval)
+        // IMPORTANT (Postgres): bulk deletes do NOT trigger JPA cascades.
+        // Delete child tables first to avoid FK constraint violations.
+        expenseItemRepository.deleteAllInBatch();
         expenseReportRepository.deleteAllInBatch();
         userRepository.deleteAllInBatch();
 

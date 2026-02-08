@@ -484,8 +484,12 @@ public class ExpenseReportService {
             var dec = SpecialReviewDecision.valueOf(d.decision.trim().toUpperCase());
             item.setFinanceDecision(dec);
             item.setFinanceReason(d.financeReason);
+
             if (dec == SpecialReviewDecision.REJECT) {
                 anyReject = true;
+                if (d.financeReason == null || d.financeReason.isBlank()) {
+                    throw new IllegalArgumentException("Finance reason is required when rejecting: " + item.getCode());
+                }
             }
         }
 

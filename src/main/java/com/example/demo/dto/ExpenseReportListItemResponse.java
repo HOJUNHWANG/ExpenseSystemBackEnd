@@ -18,4 +18,7 @@ public class ExpenseReportListItemResponse {
     private LocalDate departureDate;
     private LocalDate returnDate;
 
+    // Demo policy flags (for list/search UI)
+    private boolean flagged;
+
 }

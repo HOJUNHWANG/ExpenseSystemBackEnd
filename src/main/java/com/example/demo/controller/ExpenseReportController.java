@@ -105,6 +105,18 @@ public class ExpenseReportController {
         return ResponseEntity.ok(result);
     }
 
+    /**
+     * Update a report (demo): only allowed for owner when status is DRAFT or CHANGES_REQUESTED.
+     */
+    @PutMapping("/{id}")
+    public ResponseEntity<String> update(
+            @PathVariable Long id,
+            @RequestBody com.example.demo.dto.ExpenseReportUpdateRequest req
+    ) {
+        var st = expenseReportService.updateReport(id, req);
+        return ResponseEntity.ok(st.name());
+    }
+
     // ✅ 승인 API
     // POST /api/expense-reports/{id}/approve
     @PostMapping("/{id}/approve")

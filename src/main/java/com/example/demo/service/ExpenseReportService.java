@@ -269,6 +269,50 @@ public class ExpenseReportService {
      * Submit report.
      * If policy warnings exist, creates/updates a SpecialReview and routes to FINANCE_SPECIAL_REVIEW.
      */
+    public ExpenseReportStatus updateReport(Long reportId, com.example.demo.dto.ExpenseReportUpdateRequest req) {
+        ExpenseReport report = expenseReportRepository.findById(reportId)
+                .orElseThrow(() -> new IllegalArgumentException("Report not found: " + reportId));
+
+        if (req == null || req.getSubmitterId() == null) {
+            throw new IllegalArgumentException("submitterId is required");
+        }
+
+        if (report.getSubmitter() == null || !report.getSubmitter().getId().equals(req.getSubmitterId())) {
+            throw new IllegalStateException("Only the submitter can update this report.");
+        }
+
+        if (report.getStatus() != ExpenseReportStatus.DRAFT && report.getStatus() != ExpenseReportStatus.CHANGES_REQUESTED) {
+            throw new IllegalStateException("Only DRAFT/CHANGES_REQUESTED reports can be updated.");
+        }
+
+        if (req.getTitle() != null) report.setTitle(req.getTitle());
+        report.setDestination(req.getDestination());
+        report.setDepartureDate(req.getDepartureDate());
+        report.setReturnDate(req.getReturnDate());
+
+        // Replace items
+        report.getItems().clear();
+        double total = 0;
+        if (req.getItems() != null) {
+            for (var itemReq : req.getItems()) {
+                if (itemReq == null) continue;
+                ExpenseItem item = ExpenseItem.builder()
+                        .date(itemReq.getDate())
+                        .description(itemReq.getDescription())
+                        .amount(itemReq.getAmount())
+                        .category(itemReq.getCategory())
+                        .build();
+                item.setExpenseReport(report);
+                report.getItems().add(item);
+                total += itemReq.getAmount();
+            }
+        }
+        report.setTotalAmount(total);
+
+        expenseReportRepository.save(report);
+        return report.getStatus();
+    }
+
     public ExpenseReportStatus submitReport(Long reportId, com.example.demo.dto.SubmitRequest req) {
         ExpenseReport report = expenseReportRepository.findById(reportId)
                 .orElseThrow(() -> new IllegalArgumentException("Report not found: " + reportId));

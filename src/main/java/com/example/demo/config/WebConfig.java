@@ -14,8 +14,10 @@ public class WebConfig {
             @Override
             public void addCorsMappings(@NonNull CorsRegistry registry) {
                 registry.addMapping("/**")
-                        .allowedOrigins("http://localhost:5173")
-                        .allowedMethods("*");
+                        // Public demo: allow any origin. Tighten this for production with an allowlist.
+                        .allowedOriginPatterns("*")
+                        .allowedMethods("*")
+                        .allowedHeaders("*");
             }
         };
     }

@@ -12,3 +12,10 @@ spring:
     console:
       enabled: true
       path: /h2-console
+
+# Public demo behavior (set demo.reset.enabled=true in prod)
+demo:
+  reset:
+    enabled: false
+    cron: "0 0 0 * * *"   # midnight
+    zone: "America/New_York"

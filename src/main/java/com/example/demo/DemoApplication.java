@@ -17,9 +17,9 @@ public class DemoApplication {
 	@Bean
 	public CommandLineRunner initData(UserRepository userRepository) {
 		return args -> {
+			// Minimal seed so demo login works even before a reset.
 			if (userRepository.count() == 0) {
 
-				// 1) Test용 User 생성 (기존과 동일)
 				User employee = User.builder()
 						.name("Jun Employee")
 						.email("jun@example.com")
@@ -43,7 +43,6 @@ public class DemoApplication {
 				userRepository.save(finance);
 
 				System.out.println("👉 Seed users created.");
-
 			}
 		};
 	}

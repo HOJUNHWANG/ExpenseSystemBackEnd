@@ -1,9 +1,6 @@
 package com.example.demo.service;
 
-import com.example.demo.domain.ExpenseItem;
-import com.example.demo.domain.ExpenseReport;
-import com.example.demo.domain.ExpenseReportStatus;
-import com.example.demo.domain.User;
+import com.example.demo.domain.*;
 import com.example.demo.dto.ExpenseItemResponse;
 import com.example.demo.dto.ExpenseReportCreateRequest;
 import com.example.demo.dto.ExpenseReportListItemResponse;
@@ -22,6 +19,7 @@ import java.util.List;
 public class ExpenseReportService {
 
     private final ExpenseReportRepository expenseReportRepository;
+    private final com.example.demo.repository.SpecialReviewRepository specialReviewRepository;
     private final UserRepository userRepository;
 
     public Long createReport(ExpenseReportCreateRequest request) {
@@ -37,7 +35,7 @@ public class ExpenseReportService {
                 .submitter(submitter)
                 .build();
 
-        report.setStatus(ExpenseReportStatus.SUBMITTED);
+        report.setStatus(ExpenseReportStatus.DRAFT);
 
         // @Builder.Default 덕분에 items 리스트는 이미 new ArrayList<>() 상태라고 가정
         double total = 0;
@@ -260,6 +258,177 @@ public class ExpenseReportService {
                             .build();
                 })
                 .toList();
+    }
+
+    /**
+     * Submit report.
+     * If policy warnings exist, creates/updates a SpecialReview and routes to FINANCE_SPECIAL_REVIEW.
+     */
+    public ExpenseReportStatus submitReport(Long reportId, com.example.demo.dto.SubmitRequest req) {
+        ExpenseReport report = expenseReportRepository.findById(reportId)
+                .orElseThrow(() -> new IllegalArgumentException("Report not found: " + reportId));
+
+        if (req == null || req.getSubmitterId() == null) {
+            throw new IllegalArgumentException("submitterId is required");
+        }
+
+        if (report.getSubmitter() == null || !report.getSubmitter().getId().equals(req.getSubmitterId())) {
+            throw new IllegalStateException("Only the submitter can submit this report.");
+        }
+
+        if (report.getStatus() != ExpenseReportStatus.DRAFT && report.getStatus() != ExpenseReportStatus.CHANGES_REQUESTED) {
+            throw new IllegalStateException("Only DRAFT/CHANGES_REQUESTED reports can be submitted.");
+        }
+
+        var warnings = PolicyEngine.evaluateReportWarnings(report);
+        if (warnings.isEmpty()) {
+            // Clear any previous special review
+            specialReviewRepository.findByReportId(reportId).ifPresent(specialReviewRepository::delete);
+            report.setStatus(ExpenseReportStatus.SUBMITTED);
+            expenseReportRepository.save(report);
+            return report.getStatus();
+        }
+
+        // Build reason map
+        var reasonMap = new java.util.HashMap<String, String>();
+        if (req.getReasons() != null) {
+            for (var r : req.getReasons()) {
+                if (r == null || r.code == null) continue;
+                reasonMap.put(r.code, r.reason);
+            }
+        }
+
+        // Require reason for each warning
+        for (var w : warnings) {
+            var reason = reasonMap.get(w.getCode());
+            if (reason == null || reason.isBlank()) {
+                throw new IllegalArgumentException("Reason is required for policy warning: " + w.getCode());
+            }
+        }
+
+        SpecialReview review = specialReviewRepository.findByReportId(reportId)
+                .orElseGet(() -> SpecialReview.builder()
+                        .report(report)
+                        .createdAt(java.time.LocalDateTime.now())
+                        .status(SpecialReviewStatus.PENDING)
+                        .build());
+
+        review.setStatus(SpecialReviewStatus.PENDING);
+        review.setDecidedAt(null);
+        review.setReviewer(null);
+        review.setReviewerComment(null);
+
+        // Replace items
+        review.getItems().clear();
+        for (var w : warnings) {
+            String reason = reasonMap.get(w.getCode());
+            SpecialReviewItem item = SpecialReviewItem.builder()
+                    .review(review)
+                    .code(w.getCode())
+                    .message(w.getMessage())
+                    .employeeReason(reason)
+                    .financeDecision(null)
+                    .financeReason(null)
+                    .build();
+            review.getItems().add(item);
+        }
+
+        specialReviewRepository.save(review);
+
+        report.setStatus(ExpenseReportStatus.FINANCE_SPECIAL_REVIEW);
+        expenseReportRepository.save(report);
+        return report.getStatus();
+    }
+
+    public com.example.demo.dto.SpecialReviewResponse getSpecialReview(Long reportId) {
+        var review = specialReviewRepository.findByReportId(reportId)
+                .orElseThrow(() -> new IllegalArgumentException("Special review not found for report: " + reportId));
+
+        return com.example.demo.dto.SpecialReviewResponse.builder()
+                .id(review.getId())
+                .status(review.getStatus().name())
+                .createdAt(review.getCreatedAt())
+                .decidedAt(review.getDecidedAt())
+                .reviewerId(review.getReviewer() != null ? review.getReviewer().getId() : null)
+                .reviewerName(review.getReviewer() != null ? review.getReviewer().getName() : null)
+                .reviewerComment(review.getReviewerComment())
+                .items(review.getItems().stream().map(it -> com.example.demo.dto.SpecialReviewItemResponse.builder()
+                        .id(it.getId())
+                        .code(it.getCode())
+                        .message(it.getMessage())
+                        .employeeReason(it.getEmployeeReason())
+                        .financeDecision(it.getFinanceDecision() != null ? it.getFinanceDecision().name() : null)
+                        .financeReason(it.getFinanceReason())
+                        .build()).toList())
+                .build();
+    }
+
+    public ExpenseReportStatus decideSpecialReview(Long reportId, com.example.demo.dto.SpecialReviewDecisionRequest req) {
+        ExpenseReport report = expenseReportRepository.findById(reportId)
+                .orElseThrow(() -> new IllegalArgumentException("Report not found: " + reportId));
+
+        if (report.getStatus() != ExpenseReportStatus.FINANCE_SPECIAL_REVIEW) {
+            throw new IllegalStateException("Report is not in FINANCE_SPECIAL_REVIEW.");
+        }
+
+        if (req == null || req.getReviewerId() == null) {
+            throw new IllegalArgumentException("reviewerId is required");
+        }
+
+        boolean isFinance = req.getReviewerRole() != null && req.getReviewerRole().equalsIgnoreCase("FINANCE");
+        if (!isFinance) {
+            throw new IllegalStateException("Only FINANCE can approve special reviews.");
+        }
+
+        User reviewer = userRepository.findById(req.getReviewerId())
+                .orElseThrow(() -> new IllegalArgumentException("Reviewer not found: " + req.getReviewerId()));
+
+        SpecialReview review = specialReviewRepository.findByReportId(reportId)
+                .orElseThrow(() -> new IllegalArgumentException("Special review not found for report: " + reportId));
+
+        // Apply decisions by code
+        var decisionMap = new java.util.HashMap<String, com.example.demo.dto.SpecialReviewDecisionRequest.ItemDecision>();
+        if (req.getDecisions() != null) {
+            for (var d : req.getDecisions()) {
+                if (d == null || d.code == null) continue;
+                decisionMap.put(d.code, d);
+            }
+        }
+
+        boolean anyReject = false;
+        for (var item : review.getItems()) {
+            var d = decisionMap.get(item.getCode());
+            if (d == null || d.decision == null) {
+                throw new IllegalArgumentException("Decision required for warning: " + item.getCode());
+            }
+            var dec = SpecialReviewDecision.valueOf(d.decision.trim().toUpperCase());
+            item.setFinanceDecision(dec);
+            item.setFinanceReason(d.financeReason);
+            if (dec == SpecialReviewDecision.REJECT) {
+                anyReject = true;
+            }
+        }
+
+        review.setReviewer(reviewer);
+        review.setReviewerComment(req.getReviewerComment());
+        review.setDecidedAt(java.time.LocalDateTime.now());
+        review.setStatus(anyReject ? SpecialReviewStatus.REJECTED : SpecialReviewStatus.APPROVED);
+        specialReviewRepository.save(review);
+
+        if (anyReject) {
+            if (req.getReviewerComment() == null || req.getReviewerComment().isBlank()) {
+                throw new IllegalArgumentException("Reviewer reject reason is required.");
+            }
+            report.setStatus(ExpenseReportStatus.CHANGES_REQUESTED);
+            expenseReportRepository.save(report);
+            return report.getStatus();
+        }
+
+        // Approved special review: clear special review records and route to normal submission.
+        specialReviewRepository.delete(review);
+        report.setStatus(ExpenseReportStatus.SUBMITTED);
+        expenseReportRepository.save(report);
+        return report.getStatus();
     }
 
     // Approved

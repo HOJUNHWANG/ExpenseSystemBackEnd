@@ -58,10 +58,12 @@ public class ExpenseReportController {
             @RequestParam Long requesterId,
             @RequestParam String requesterRole,
             @RequestParam(required = false) String q,
+            @RequestParam(required = false) String status,
             @RequestParam(required = false) Double minTotal,
-            @RequestParam(required = false) Double maxTotal
+            @RequestParam(required = false) Double maxTotal,
+            @RequestParam(required = false, defaultValue = "activity_desc") String sort
     ) {
-        return ResponseEntity.ok(expenseReportService.searchReports(requesterId, requesterRole, q, minTotal, maxTotal));
+        return ResponseEntity.ok(expenseReportService.searchReports(requesterId, requesterRole, q, status, minTotal, maxTotal, sort));
     }
 
     @GetMapping("/activity")

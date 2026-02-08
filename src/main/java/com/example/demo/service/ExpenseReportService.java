@@ -168,15 +168,38 @@ public class ExpenseReportService {
      *
      * If requesterRole is not MANAGER/FINANCE, results are restricted to requesterId (submitter).
      */
-    public List<ExpenseReportListItemResponse> searchReports(Long requesterId, String requesterRole, String q, Double minTotal, Double maxTotal) {
+    public List<ExpenseReportListItemResponse> searchReports(Long requesterId, String requesterRole, String q, String status, Double minTotal, Double maxTotal, String sort) {
         boolean approver = requesterRole != null && (
                 requesterRole.equalsIgnoreCase("MANAGER") || requesterRole.equalsIgnoreCase("FINANCE")
         );
 
         Long submitterId = approver ? null : requesterId;
 
-        return expenseReportRepository.search(submitterId, q, minTotal, maxTotal)
-                .stream()
+        ExpenseReportStatus st = null;
+        if (status != null && !status.isBlank()) {
+            st = ExpenseReportStatus.valueOf(status.trim().toUpperCase());
+        }
+
+        var list = expenseReportRepository.search(submitterId, q, st, minTotal, maxTotal);
+
+        // Sort in-memory for simplicity (demo scale). Options:
+        // - activity_desc: approvedAt/createdAt desc
+        // - total_desc / total_asc
+        if (sort != null && !sort.isBlank()) {
+            switch (sort) {
+                case "activity_desc" -> list.sort((a, b) -> {
+                    var aT = a.getApprovedAt() != null ? a.getApprovedAt() : a.getCreatedAt();
+                    var bT = b.getApprovedAt() != null ? b.getApprovedAt() : b.getCreatedAt();
+                    return bT.compareTo(aT);
+                });
+                case "total_desc" -> list.sort((a, b) -> Double.compare(b.getTotalAmount(), a.getTotalAmount()));
+                case "total_asc" -> list.sort((a, b) -> Double.compare(a.getTotalAmount(), b.getTotalAmount()));
+                default -> {
+                }
+            }
+        }
+
+        return list.stream()
                 .map(r -> ExpenseReportListItemResponse.builder()
                         .id(r.getId())
                         .title(r.getTitle())

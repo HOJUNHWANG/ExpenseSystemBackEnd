@@ -19,6 +19,7 @@ public interface ExpenseReportRepository extends JpaRepository<ExpenseReport, Lo
         select r from ExpenseReport r
         where (:submitterId is null or r.submitter.id = :submitterId)
           and (:q is null or :q = '' or lower(r.title) like lower(concat('%', :q, '%')))
+          and (:status is null or r.status = :status)
           and (:minTotal is null or r.totalAmount >= :minTotal)
           and (:maxTotal is null or r.totalAmount <= :maxTotal)
         order by r.createdAt desc
@@ -26,6 +27,7 @@ public interface ExpenseReportRepository extends JpaRepository<ExpenseReport, Lo
     List<ExpenseReport> search(
             @Param("submitterId") Long submitterId,
             @Param("q") String q,
+            @Param("status") ExpenseReportStatus status,
             @Param("minTotal") Double minTotal,
             @Param("maxTotal") Double maxTotal
     );

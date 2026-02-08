@@ -163,6 +163,66 @@ public class ExpenseReportService {
                 .toList();
     }
 
+    /**
+     * Demo-friendly search endpoint.
+     *
+     * If requesterRole is not MANAGER/FINANCE, results are restricted to requesterId (submitter).
+     */
+    public List<ExpenseReportListItemResponse> searchReports(Long requesterId, String requesterRole, String q, Double minTotal, Double maxTotal) {
+        boolean approver = requesterRole != null && (
+                requesterRole.equalsIgnoreCase("MANAGER") || requesterRole.equalsIgnoreCase("FINANCE")
+        );
+
+        Long submitterId = approver ? null : requesterId;
+
+        return expenseReportRepository.search(submitterId, q, minTotal, maxTotal)
+                .stream()
+                .map(r -> ExpenseReportListItemResponse.builder()
+                        .id(r.getId())
+                        .title(r.getTitle())
+                        .totalAmount(r.getTotalAmount())
+                        .status(r.getStatus().name())
+                        .destination(r.getDestination())
+                        .departureDate(r.getDepartureDate())
+                        .returnDate(r.getReturnDate())
+                        .build()
+                )
+                .toList();
+    }
+
+    public List<com.example.demo.dto.ExpenseReportActivityItem> getRecentActivity(Long requesterId, String requesterRole, int limit) {
+        boolean approver = requesterRole != null && (
+                requesterRole.equalsIgnoreCase("MANAGER") || requesterRole.equalsIgnoreCase("FINANCE")
+        );
+        Long submitterId = approver ? null : requesterId;
+
+        return expenseReportRepository.recentActivity(submitterId)
+                .stream()
+                .limit(Math.max(1, Math.min(limit, 20)))
+                .map(r -> {
+                    var last = r.getApprovedAt() != null ? r.getApprovedAt() : r.getCreatedAt();
+                    String label;
+                    if (r.getApprovedAt() != null) {
+                        label = r.getStatus() == ExpenseReportStatus.APPROVED ? "Approved" : "Rejected";
+                    } else {
+                        label = "Created";
+                    }
+                    return com.example.demo.dto.ExpenseReportActivityItem.builder()
+                            .id(r.getId())
+                            .title(r.getTitle())
+                            .status(r.getStatus().name())
+                            .totalAmount(r.getTotalAmount())
+                            .submitterId(r.getSubmitter() != null ? r.getSubmitter().getId() : null)
+                            .submitterName(r.getSubmitter() != null ? r.getSubmitter().getName() : null)
+                            .createdAt(r.getCreatedAt())
+                            .approvedAt(r.getApprovedAt())
+                            .lastActivityAt(last)
+                            .activityLabel(label)
+                            .build();
+                })
+                .toList();
+    }
+
     // Approved
     public void approveReport(Long reportId, ApprovalRequest req) {
         ExpenseReport report = expenseReportRepository.findById(reportId)

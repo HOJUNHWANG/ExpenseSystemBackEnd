@@ -47,6 +47,32 @@ public class ExpenseReportController {
         return ResponseEntity.ok(expenseReportService.getReportsPendingApproval());
     }
 
+    /**
+     * Demo-friendly search.
+     *
+     * - EMPLOYEE: can only search their own reports
+     * - MANAGER/FINANCE: can search all reports
+     */
+    @GetMapping("/search")
+    public ResponseEntity<List<ExpenseReportListItemResponse>> search(
+            @RequestParam Long requesterId,
+            @RequestParam String requesterRole,
+            @RequestParam(required = false) String q,
+            @RequestParam(required = false) Double minTotal,
+            @RequestParam(required = false) Double maxTotal
+    ) {
+        return ResponseEntity.ok(expenseReportService.searchReports(requesterId, requesterRole, q, minTotal, maxTotal));
+    }
+
+    @GetMapping("/activity")
+    public ResponseEntity<List<com.example.demo.dto.ExpenseReportActivityItem>> activity(
+            @RequestParam Long requesterId,
+            @RequestParam String requesterRole,
+            @RequestParam(required = false, defaultValue = "10") int limit
+    ) {
+        return ResponseEntity.ok(expenseReportService.getRecentActivity(requesterId, requesterRole, limit));
+    }
+
     // ✅ 2) 상세 조회: /api/expense-reports/{id}
     @GetMapping("/{id}")
     public ResponseEntity<ExpenseReportResponse> getOne(@PathVariable Long id) {

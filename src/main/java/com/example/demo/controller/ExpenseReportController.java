@@ -60,6 +60,15 @@ public class ExpenseReportController {
         return ResponseEntity.ok(expenseReportService.getSpecialReview(id));
     }
 
+    // Submitter: view feedback (after CHANGES_REQUESTED)
+    @GetMapping("/{id}/submitter-feedback")
+    public ResponseEntity<com.example.demo.dto.SubmitterFeedbackResponse> submitterFeedback(
+            @PathVariable Long id,
+            @RequestParam Long requesterId
+    ) {
+        return ResponseEntity.ok(expenseReportService.getSubmitterFeedback(id, requesterId));
+    }
+
     // Finance: decide special review (approve/reject per item)
     @PostMapping("/{id}/special-review/decide")
     public ResponseEntity<String> decideSpecialReview(

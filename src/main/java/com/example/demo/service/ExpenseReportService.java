@@ -412,6 +412,37 @@ public class ExpenseReportService {
                 .build();
     }
 
+    public com.example.demo.dto.SubmitterFeedbackResponse getSubmitterFeedback(Long reportId, Long requesterId) {
+        ExpenseReport report = expenseReportRepository.findById(reportId)
+                .orElseThrow(() -> new IllegalArgumentException("Report not found: " + reportId));
+
+        if (requesterId == null) {
+            throw new IllegalArgumentException("requesterId is required");
+        }
+
+        if (report.getSubmitter() == null || !report.getSubmitter().getId().equals(requesterId)) {
+            throw new IllegalStateException("Only the submitter can view feedback.");
+        }
+
+        var review = specialReviewRepository.findByReportId(reportId)
+                .orElseThrow(() -> new IllegalArgumentException("Feedback not found for report: " + reportId));
+
+        return com.example.demo.dto.SubmitterFeedbackResponse.builder()
+                .specialReviewStatus(review.getStatus().name())
+                .decidedAt(review.getDecidedAt())
+                .reviewerName(review.getReviewer() != null ? review.getReviewer().getName() : null)
+                .reviewerComment(review.getReviewerComment())
+                .items(review.getItems().stream().map(it -> com.example.demo.dto.SpecialReviewItemResponse.builder()
+                        .id(it.getId())
+                        .code(it.getCode())
+                        .message(it.getMessage())
+                        .employeeReason(it.getEmployeeReason())
+                        .financeDecision(it.getFinanceDecision() != null ? it.getFinanceDecision().name() : null)
+                        .financeReason(it.getFinanceReason())
+                        .build()).toList())
+                .build();
+    }
+
     public ExpenseReportStatus decideSpecialReview(Long reportId, com.example.demo.dto.SpecialReviewDecisionRequest req) {
         ExpenseReport report = expenseReportRepository.findById(reportId)
                 .orElseThrow(() -> new IllegalArgumentException("Report not found: " + reportId));

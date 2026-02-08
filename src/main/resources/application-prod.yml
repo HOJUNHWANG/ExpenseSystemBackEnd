@@ -1,0 +1,29 @@
+server:
+  port: ${PORT:8080}
+
+spring:
+  datasource:
+    # Render/Supabase/etc: set these env vars
+    url: ${SPRING_DATASOURCE_URL:}
+    username: ${SPRING_DATASOURCE_USERNAME:}
+    password: ${SPRING_DATASOURCE_PASSWORD:}
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: false
+
+# Public demo behavior
+demo:
+  reset:
+    enabled: ${DEMO_RESET_ENABLED:true}
+    cron: ${DEMO_RESET_CRON:0 0 0 * * *}
+    zone: ${DEMO_RESET_ZONE:America/New_York}
+
+app:
+  cors:
+    # comma-separated allowlist. Example: "https://your-vercel-app.vercel.app,https://expense.yourdomain.com"
+    allowed-origins: ${APP_CORS_ALLOWED_ORIGINS:*}

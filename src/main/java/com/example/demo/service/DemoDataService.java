@@ -17,6 +17,7 @@ public class DemoDataService {
 
     private final ExpenseReportRepository expenseReportRepository;
     private final com.example.demo.repository.ExpenseItemRepository expenseItemRepository;
+    private final com.example.demo.repository.SpecialReviewItemRepository specialReviewItemRepository;
     private final com.example.demo.repository.SpecialReviewRepository specialReviewRepository;
     private final UserRepository userRepository;
 
@@ -25,6 +26,7 @@ public class DemoDataService {
         // IMPORTANT (Postgres): bulk deletes do NOT trigger JPA cascades.
         // Delete child tables first to avoid FK constraint violations.
         expenseItemRepository.deleteAllInBatch();
+        specialReviewItemRepository.deleteAllInBatch();
         specialReviewRepository.deleteAllInBatch();
         expenseReportRepository.deleteAllInBatch();
         userRepository.deleteAllInBatch();

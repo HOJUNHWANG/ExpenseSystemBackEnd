@@ -93,7 +93,8 @@ public class ExpenseReportService {
         ExpenseReport r = expenseReportRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Report not found: " + id));
 
-        var flags = PolicyEngine.evaluateReport(r);
+        var warnings = PolicyEngine.evaluateReportWarnings(r);
+        var flags = warnings.stream().map(PolicyEngine.Warning::getMessage).toList();
 
         return ExpenseReportResponse.builder()
                 .id(r.getId())
@@ -112,6 +113,10 @@ public class ExpenseReportService {
                 .approvalComment(r.getApprovalComment())
                 .flagged(!flags.isEmpty())
                 .policyFlags(flags)
+                .policyWarnings(warnings.stream().map(w -> com.example.demo.dto.PolicyWarningResponse.builder()
+                        .code(w.getCode())
+                        .message(w.getMessage())
+                        .build()).toList())
                 .items(
                         r.getItems().stream()
                                 .map(i -> ExpenseItemResponse.builder()

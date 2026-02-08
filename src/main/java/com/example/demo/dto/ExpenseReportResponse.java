@@ -36,5 +36,8 @@ public class ExpenseReportResponse {
     private boolean flagged;
     private List<String> policyFlags;
 
+    // Code-based warnings for submit UX
+    private List<PolicyWarningResponse> policyWarnings;
+
     private List<ExpenseItemResponse> items;
 }

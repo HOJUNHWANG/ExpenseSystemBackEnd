@@ -74,16 +74,19 @@ public class ExpenseReportService {
                 expenseReportRepository.findBySubmitterId(submitterId);
 
         return reports.stream()
-                .map(r -> ExpenseReportListItemResponse.builder()
-                        .id(r.getId())
-                        .title(r.getTitle())
-                        .totalAmount(r.getTotalAmount())
-                        .status(r.getStatus().name())
-                        .destination(r.getDestination())
-                        .departureDate(r.getDepartureDate())
-                        .returnDate(r.getReturnDate())
-                        .build()
-                )
+                .map(r -> {
+                    boolean flagged = !PolicyEngine.evaluateReport(r).isEmpty();
+                    return ExpenseReportListItemResponse.builder()
+                            .id(r.getId())
+                            .title(r.getTitle())
+                            .totalAmount(r.getTotalAmount())
+                            .status(r.getStatus().name())
+                            .destination(r.getDestination())
+                            .departureDate(r.getDepartureDate())
+                            .returnDate(r.getReturnDate())
+                            .flagged(flagged)
+                            .build();
+                })
                 .toList();
     }
 
@@ -91,6 +94,8 @@ public class ExpenseReportService {
     public ExpenseReportResponse getReport (Long id){
         ExpenseReport r = expenseReportRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Report not found: " + id));
+
+        var flags = PolicyEngine.evaluateReport(r);
 
         return ExpenseReportResponse.builder()
                 .id(r.getId())
@@ -107,6 +112,8 @@ public class ExpenseReportService {
                 .approverId(r.getApprover() != null ? r.getApprover().getId() : null)
                 .approverName(r.getApprover() != null ? r.getApprover().getName() : null)
                 .approvalComment(r.getApprovalComment())
+                .flagged(!flags.isEmpty())
+                .policyFlags(flags)
                 .items(
                         r.getItems().stream()
                                 .map(i -> ExpenseItemResponse.builder()
@@ -126,22 +133,23 @@ public class ExpenseReportService {
 
     // ✅ 3) 특정 사용자의 특정 상태 보고서 목록
     public List<ExpenseReportListItemResponse> findBySubmitterAndStatus(Long submitterId, ExpenseReportStatus status) {
-        // Repository에 findBySubmitterIdAndStatus라는 메서드가 정의되어 있다고 가정합니다.
         List<ExpenseReport> reports =
                 expenseReportRepository.findBySubmitterIdAndStatus(submitterId, status);
 
-        // DTO 변환 로직은 getReportsBySubmitter와 동일합니다.
         return reports.stream()
-                .map(r -> ExpenseReportListItemResponse.builder()
-                        .id(r.getId())
-                        .title(r.getTitle())
-                        .totalAmount(r.getTotalAmount())
-                        .status(r.getStatus().name())
-                        .destination(r.getDestination())
-                        .departureDate(r.getDepartureDate())
-                        .returnDate(r.getReturnDate())
-                        .build()
-                )
+                .map(r -> {
+                    boolean flagged = !PolicyEngine.evaluateReport(r).isEmpty();
+                    return ExpenseReportListItemResponse.builder()
+                            .id(r.getId())
+                            .title(r.getTitle())
+                            .totalAmount(r.getTotalAmount())
+                            .status(r.getStatus().name())
+                            .destination(r.getDestination())
+                            .departureDate(r.getDepartureDate())
+                            .returnDate(r.getReturnDate())
+                            .flagged(flagged)
+                            .build();
+                })
                 .toList();
     }
 
@@ -150,16 +158,19 @@ public class ExpenseReportService {
                 expenseReportRepository.findByStatus(ExpenseReportStatus.SUBMITTED);
 
         return reports.stream()
-                .map(r -> ExpenseReportListItemResponse.builder()
-                        .id(r.getId())
-                        .title(r.getTitle())
-                        .totalAmount(r.getTotalAmount())
-                        .status(r.getStatus().name())
-                        .destination(r.getDestination())
-                        .departureDate(r.getDepartureDate())
-                        .returnDate(r.getReturnDate())
-                        .build()
-                )
+                .map(r -> {
+                    boolean flagged = !PolicyEngine.evaluateReport(r).isEmpty();
+                    return ExpenseReportListItemResponse.builder()
+                            .id(r.getId())
+                            .title(r.getTitle())
+                            .totalAmount(r.getTotalAmount())
+                            .status(r.getStatus().name())
+                            .destination(r.getDestination())
+                            .departureDate(r.getDepartureDate())
+                            .returnDate(r.getReturnDate())
+                            .flagged(flagged)
+                            .build();
+                })
                 .toList();
     }
 
@@ -200,16 +211,19 @@ public class ExpenseReportService {
         }
 
         return list.stream()
-                .map(r -> ExpenseReportListItemResponse.builder()
-                        .id(r.getId())
-                        .title(r.getTitle())
-                        .totalAmount(r.getTotalAmount())
-                        .status(r.getStatus().name())
-                        .destination(r.getDestination())
-                        .departureDate(r.getDepartureDate())
-                        .returnDate(r.getReturnDate())
-                        .build()
-                )
+                .map(r -> {
+                    boolean flagged = !PolicyEngine.evaluateReport(r).isEmpty();
+                    return ExpenseReportListItemResponse.builder()
+                            .id(r.getId())
+                            .title(r.getTitle())
+                            .totalAmount(r.getTotalAmount())
+                            .status(r.getStatus().name())
+                            .destination(r.getDestination())
+                            .departureDate(r.getDepartureDate())
+                            .returnDate(r.getReturnDate())
+                            .flagged(flagged)
+                            .build();
+                })
                 .toList();
     }
 
@@ -230,6 +244,7 @@ public class ExpenseReportService {
                     } else {
                         label = "Created";
                     }
+                    boolean flagged = !PolicyEngine.evaluateReport(r).isEmpty();
                     return com.example.demo.dto.ExpenseReportActivityItem.builder()
                             .id(r.getId())
                             .title(r.getTitle())
@@ -241,6 +256,7 @@ public class ExpenseReportService {
                             .approvedAt(r.getApprovedAt())
                             .lastActivityAt(last)
                             .activityLabel(label)
+                            .flagged(flagged)
                             .build();
                 })
                 .toList();

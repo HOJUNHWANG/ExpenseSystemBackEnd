@@ -22,4 +22,6 @@ public class ExpenseReportActivityItem {
     private LocalDateTime approvedAt;
     private LocalDateTime lastActivityAt;
     private String activityLabel;
+
+    private boolean flagged;
 }

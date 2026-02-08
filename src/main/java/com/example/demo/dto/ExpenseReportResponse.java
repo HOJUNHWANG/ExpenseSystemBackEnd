@@ -32,5 +32,9 @@ public class ExpenseReportResponse {
 
     private String approvalComment;
 
+    // Demo policy flags
+    private boolean flagged;
+    private List<String> policyFlags;
+
     private List<ExpenseItemResponse> items;
 }

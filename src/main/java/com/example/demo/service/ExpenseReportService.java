@@ -582,7 +582,7 @@ public class ExpenseReportService {
         String approverRole = approver.getRole();
         if (approverRole == null) approverRole = "";
 
-        if (st == ExpenseReportStatus.MANAGER_REVIEW) {
+        if (st == ExpenseReportStatus.MANAGER_REVIEW || st == ExpenseReportStatus.SUBMITTED /* legacy */) {
             if (!approverRole.equalsIgnoreCase("MANAGER")) {
                 throw new IllegalStateException("Only MANAGER can approve MANAGER_REVIEW reports.");
             }
@@ -633,7 +633,8 @@ public class ExpenseReportService {
 
         if (report.getStatus() != ExpenseReportStatus.MANAGER_REVIEW
                 && report.getStatus() != ExpenseReportStatus.CFO_REVIEW
-                && report.getStatus() != ExpenseReportStatus.CEO_REVIEW) {
+                && report.getStatus() != ExpenseReportStatus.CEO_REVIEW
+                && report.getStatus() != ExpenseReportStatus.SUBMITTED /* legacy */) {
             throw new IllegalStateException("Only MANAGER_REVIEW/CFO_REVIEW/CEO_REVIEW reports can be rejected.");
         }
 

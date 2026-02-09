@@ -7,6 +7,11 @@ public enum ExpenseReportStatus {
 
     DRAFT,
 
+    // Legacy statuses (kept for backward compatibility with existing DB rows)
+    // NOTE: new workflow should NOT write these.
+    SUBMITTED,
+    FINANCE_SPECIAL_REVIEW,
+
     // Normal approval chain
     MANAGER_REVIEW,
     CFO_REVIEW,

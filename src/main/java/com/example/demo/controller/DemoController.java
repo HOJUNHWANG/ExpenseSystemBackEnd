@@ -22,7 +22,9 @@ public class DemoController {
         } catch (Exception e) {
             // Log for Render logs; return a safe message to the client.
             e.printStackTrace();
-            return ResponseEntity.status(500).body("Demo reset failed");
+            String msg = e.getMessage();
+            if (msg == null || msg.isBlank()) msg = e.getClass().getSimpleName();
+            return ResponseEntity.status(500).body("Demo reset failed: " + msg);
         }
     }
 }

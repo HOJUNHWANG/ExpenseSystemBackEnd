@@ -87,14 +87,14 @@ public class DemoDataService {
         // Hotel > $300/night triggers warning; also add >=$25 so receipt warning could apply depending on PolicyEngine.
         ExpenseReport needsFinance = seedReport(employee, null,
                 "Draft — Hotel Exception (needs Finance)",
-                "Boston",
+                "Boston, United States",
                 LocalDate.now().minusDays(6),
                 LocalDate.now().minusDays(5),
                 ExpenseReportStatus.CFO_SPECIAL_REVIEW,
                 null,
                 List.of(
-                        ExpenseItem.builder().date(LocalDate.now().minusDays(6)).description("Hotel").amount(410.00).category("Lodging").build(),
-                        ExpenseItem.builder().date(LocalDate.now().minusDays(5)).description("Dinner").amount(48.20).category("Meals").build()
+                        ExpenseItem.builder().date(LocalDate.now().minusDays(6)).description("Hotel").amount(410.00).category("Hotel").build(),
+                        ExpenseItem.builder().date(LocalDate.now().minusDays(5)).description("Meal").amount(48.20).category("Meal").build()
                 ));
 
         seedSpecialReviewPending(needsFinance, employee,
@@ -125,20 +125,22 @@ public class DemoDataService {
         // 4) MANAGER_REVIEW (pending manager approval): keep approval queue populated
         seedReport(employee, null,
                 "Submitted — NYC Trip",
-                "New York",
+                "New York, United States",
                 LocalDate.now().minusDays(4),
                 LocalDate.now().minusDays(2),
                 ExpenseReportStatus.MANAGER_REVIEW,
                 null,
                 List.of(
-                        ExpenseItem.builder().date(LocalDate.now().minusDays(4)).description("Flight").amount(320.45).category("Travel").build(),
-                        ExpenseItem.builder().date(LocalDate.now().minusDays(3)).description("Hotel").amount(280.00).category("Lodging").build(),
-                        ExpenseItem.builder().date(LocalDate.now().minusDays(3)).description("Meals").amount(58.90).category("Meals").build()
+                        ExpenseItem.builder().date(LocalDate.now().minusDays(4)).description("Airfare").amount(320.45).category("Airfare").build(),
+                        // Keep under $250 nightly cap so this seeded MANAGER_REVIEW report is clean.
+                        ExpenseItem.builder().date(LocalDate.now().minusDays(3)).description("Hotel").amount(240.00).category("Hotel").build(),
+                        // Keep under meal daily cap ($75)
+                        ExpenseItem.builder().date(LocalDate.now().minusDays(3)).description("Meal").amount(58.90).category("Meal").build()
                 ));
 
         seedReport(employee, null,
                 "Submitted — Local Travel — NJ",
-                "New Jersey",
+                "New Jersey, United States",
                 LocalDate.now().minusDays(3),
                 LocalDate.now().minusDays(3),
                 ExpenseReportStatus.MANAGER_REVIEW,
@@ -151,38 +153,40 @@ public class DemoDataService {
         // CFO review queue example (created by Manager)
         seedReport(manager, null,
                 "Manager submitted — Vendor dinner",
-                "New York",
+                "New York, United States",
                 LocalDate.now().minusDays(5),
                 LocalDate.now().minusDays(5),
                 ExpenseReportStatus.CFO_REVIEW,
                 null,
                 List.of(
-                        ExpenseItem.builder().date(LocalDate.now().minusDays(5)).description("Team dinner with vendor").amount(210.00).category("Entertainment").build()
+                        // Keep under entertainment cap ($100) so CFO_REVIEW example is clean.
+                        ExpenseItem.builder().date(LocalDate.now().minusDays(5)).description("Team dinner with vendor").amount(90.00).category("Entertainment").build()
                 ));
 
         // CEO review queue example (created by CFO)
         seedReport(cfo, null,
                 "CFO submitted — Board meeting travel",
-                "Washington, DC",
+                "Washington, DC, United States",
                 LocalDate.now().minusDays(8),
                 LocalDate.now().minusDays(7),
                 ExpenseReportStatus.CEO_REVIEW,
                 null,
                 List.of(
-                        ExpenseItem.builder().date(LocalDate.now().minusDays(8)).description("Flight").amount(680.00).category("Travel").build(),
-                        ExpenseItem.builder().date(LocalDate.now().minusDays(7)).description("Hotel").amount(295.00).category("Lodging").build()
+                        ExpenseItem.builder().date(LocalDate.now().minusDays(8)).description("Airfare").amount(480.00).category("Airfare").build(),
+                        ExpenseItem.builder().date(LocalDate.now().minusDays(7)).description("Hotel").amount(245.00).category("Hotel").build()
                 ));
 
         // CFO review queue example (created by CEO)
         seedReport(ceo, null,
                 "CEO submitted — Executive offsite",
-                "Boston",
+                "Boston, United States",
                 LocalDate.now().minusDays(9),
                 LocalDate.now().minusDays(9),
                 ExpenseReportStatus.CFO_REVIEW,
                 null,
                 List.of(
-                        ExpenseItem.builder().date(LocalDate.now().minusDays(9)).description("Executive lunch").amount(96.00).category("Meals").build()
+                        // Keep under meal daily cap ($75)
+                        ExpenseItem.builder().date(LocalDate.now().minusDays(9)).description("Executive lunch").amount(68.00).category("Meal").build()
                 ));
 
         // 5) APPROVED

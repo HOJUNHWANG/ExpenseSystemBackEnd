@@ -416,7 +416,15 @@ public class ExpenseReportService {
 
         specialReviewRepository.save(review);
 
-        report.setStatus(ExpenseReportStatus.CFO_SPECIAL_REVIEW);
+        // Special review reviewer depends on who submitted:
+        // - If CFO submits and still has exceptions, CEO should special-review
+        // - Otherwise CFO special-reviews
+        String role = report.getSubmitter() != null ? report.getSubmitter().getRole() : null;
+        if (role != null && role.equalsIgnoreCase("CFO")) {
+            report.setStatus(ExpenseReportStatus.CEO_SPECIAL_REVIEW);
+        } else {
+            report.setStatus(ExpenseReportStatus.CFO_SPECIAL_REVIEW);
+        }
         expenseReportRepository.save(report);
         return report.getStatus();
     }
@@ -479,17 +487,22 @@ public class ExpenseReportService {
         ExpenseReport report = expenseReportRepository.findById(reportId)
                 .orElseThrow(() -> new IllegalArgumentException("Report not found: " + reportId));
 
-        if (report.getStatus() != ExpenseReportStatus.CFO_SPECIAL_REVIEW) {
-            throw new IllegalStateException("Report is not in CFO_SPECIAL_REVIEW.");
+        boolean cfoPath = report.getStatus() == ExpenseReportStatus.CFO_SPECIAL_REVIEW;
+        boolean ceoPath = report.getStatus() == ExpenseReportStatus.CEO_SPECIAL_REVIEW;
+        if (!cfoPath && !ceoPath) {
+            throw new IllegalStateException("Report is not in a special review state.");
         }
 
         if (req == null || req.getReviewerId() == null) {
             throw new IllegalArgumentException("reviewerId is required");
         }
 
-        boolean isCfo = req.getReviewerRole() != null && req.getReviewerRole().equalsIgnoreCase("CFO");
-        if (!isCfo) {
-            throw new IllegalStateException("Only CFO can approve special reviews.");
+        String reviewerRole = req.getReviewerRole() != null ? req.getReviewerRole().trim() : "";
+        if (cfoPath && !reviewerRole.equalsIgnoreCase("CFO")) {
+            throw new IllegalStateException("Only CFO can approve CFO special reviews.");
+        }
+        if (ceoPath && !reviewerRole.equalsIgnoreCase("CEO")) {
+            throw new IllegalStateException("Only CEO can approve CEO special reviews.");
         }
 
         User reviewer = userRepository.findById(req.getReviewerId())

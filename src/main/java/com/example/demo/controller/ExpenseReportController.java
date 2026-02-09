@@ -131,6 +131,16 @@ public class ExpenseReportController {
         return ResponseEntity.ok(st.name());
     }
 
+    // Delete draft
+    @DeleteMapping("/{id}")
+    public ResponseEntity<?> delete(
+            @PathVariable Long id,
+            @RequestParam Long requesterId
+    ) {
+        expenseReportService.deleteDraft(id, requesterId);
+        return ResponseEntity.ok().build();
+    }
+
     // ✅ 승인 API
     // POST /api/expense-reports/{id}/approve
     @PostMapping("/{id}/approve")

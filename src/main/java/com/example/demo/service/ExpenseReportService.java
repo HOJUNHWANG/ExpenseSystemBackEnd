@@ -379,13 +379,8 @@ public class ExpenseReportService {
             }
         }
 
-        // Require reason for each warning
-        for (var w : warnings) {
-            var reason = reasonMap.get(w.getCode());
-            if (reason == null || reason.isBlank()) {
-                throw new IllegalArgumentException("Reason is required for policy warning: " + w.getCode());
-            }
-        }
+        // In this public demo we allow submitting without providing per-warning reasons.
+        // (The UI can collect reasons, but we don't hard-require them to keep the flow frictionless.)
 
         SpecialReview review = specialReviewRepository.findByReportId(reportId)
                 .orElseGet(() -> SpecialReview.builder()
@@ -402,7 +397,7 @@ public class ExpenseReportService {
         // Replace items
         review.getItems().clear();
         for (var w : warnings) {
-            String reason = reasonMap.get(w.getCode());
+            String reason = reasonMap.getOrDefault(w.getCode(), "");
             SpecialReviewItem item = SpecialReviewItem.builder()
                     .review(review)
                     .code(w.getCode())
@@ -630,6 +625,27 @@ public class ExpenseReportService {
         }
 
         throw new IllegalStateException("Only MANAGER_REVIEW/CFO_REVIEW/CEO_REVIEW reports can be approved.");
+    }
+
+    public void deleteDraft(Long reportId, Long requesterId) {
+        ExpenseReport report = expenseReportRepository.findById(reportId)
+                .orElseThrow(() -> new IllegalArgumentException("Report not found: " + reportId));
+
+        if (requesterId == null) {
+            throw new IllegalArgumentException("requesterId is required");
+        }
+
+        if (report.getSubmitter() == null || !report.getSubmitter().getId().equals(requesterId)) {
+            throw new IllegalStateException("Only the submitter can delete this report.");
+        }
+
+        if (report.getStatus() != ExpenseReportStatus.DRAFT) {
+            throw new IllegalStateException("Only DRAFT reports can be deleted.");
+        }
+
+        // If a special review exists for some reason, delete it too.
+        specialReviewRepository.findByReportId(reportId).ifPresent(specialReviewRepository::delete);
+        expenseReportRepository.delete(report);
     }
 
     // Reject

@@ -109,7 +109,7 @@ async function main() {
   // 2) Login
   const employee = await login("jun@example.com");
   const manager = await login("manager@example.com");
-  const finance = await login("finance@example.com");
+  const cfo = await login("finance@example.com");
   console.log("[api-smoke] login OK");
 
   // 3) Seed sanity via search (manager sees all)
@@ -120,24 +120,24 @@ async function main() {
   const changesReq = findByTitle(all, "Changes requested — Meals cap exception");
   const submitted = findByTitle(all, "Submitted — NYC Trip");
 
-  // 4) Submit clean DRAFT → SUBMITTED
+  // 4) Submit clean DRAFT → MANAGER_REVIEW (normal approval chain entry)
   {
     const before = await getReport(draftClean.id);
     assert.equal(before.status, "DRAFT");
 
     const s = await submitReport(draftClean.id, { submitterId: employee.id, reasons: [] });
     await expectOk(s, "submit clean draft failed");
-    assert.equal(s.data, "SUBMITTED");
+    assert.equal(s.data, "MANAGER_REVIEW");
 
     const after = await getReport(draftClean.id);
-    assert.equal(after.status, "SUBMITTED");
+    assert.equal(after.status, "MANAGER_REVIEW");
   }
-  console.log("[api-smoke] submit clean DRAFT -> SUBMITTED OK");
+  console.log("[api-smoke] submit clean DRAFT -> MANAGER_REVIEW OK");
 
-  // 5) Finance special review reject validations
+  // 5) CFO special review reject validations
   {
     const report = await getReport(financePending.id);
-    assert.equal(report.status, "FINANCE_SPECIAL_REVIEW");
+    assert.equal(report.status, "CFO_SPECIAL_REVIEW");
 
     const review = await getSpecialReview(financePending.id);
     assert.equal(review.status, "PENDING");
@@ -147,8 +147,8 @@ async function main() {
     const first = review.items[0];
 
     const bad = await decideSpecialReview(financePending.id, {
-      reviewerId: finance.id,
-      reviewerRole: "FINANCE",
+      reviewerId: cfo.id,
+      reviewerRole: "CFO",
       reviewerComment: "Rejecting due to policy.",
       decisions: review.items.map((it) => ({
         code: it.code,
@@ -162,8 +162,8 @@ async function main() {
 
     // Reject first item WITH financeReason => must succeed and report becomes CHANGES_REQUESTED
     const good = await decideSpecialReview(financePending.id, {
-      reviewerId: finance.id,
-      reviewerRole: "FINANCE",
+      reviewerId: cfo.id,
+      reviewerRole: "CFO",
       reviewerComment: "Please revise and resubmit.",
       decisions: review.items.map((it) => ({
         code: it.code,
@@ -178,7 +178,7 @@ async function main() {
     const after = await getReport(financePending.id);
     assert.equal(after.status, "CHANGES_REQUESTED");
   }
-  console.log("[api-smoke] finance reject validation OK");
+  console.log("[api-smoke] CFO reject validation OK");
 
   // 6) Existing CHANGES_REQUESTED has feedback visible to submitter
   {
@@ -186,16 +186,22 @@ async function main() {
     await expectOk(r, "submitter feedback fetch failed");
     assert.equal(r.data?.specialReviewStatus, "REJECTED");
     assert.ok(r.data?.reviewerComment, "feedback should include reviewerComment");
-    assert.ok(r.data?.items?.some((x) => x.financeDecision === "REJECT" && x.financeReason), "feedback should include rejected item financeReason");
+    assert.ok(
+      r.data?.items?.some((x) => x.financeDecision === "REJECT" && x.financeReason),
+      "feedback should include rejected item financeReason"
+    );
   }
   console.log("[api-smoke] changes-requested feedback OK");
 
-  // 7) Approval queue contains SUBMITTED report
+  // 7) Approval queue contains MANAGER_REVIEW report (manager view)
   {
-    const q = await http("/api/expense-reports/pending-approval");
+    const q = await http("/api/expense-reports/pending-approval?requesterRole=MANAGER");
     await expectOk(q, "pending approval fetch failed");
     assert.ok(Array.isArray(q.data), "pending-approval should return array");
-    assert.ok(q.data.some((x) => x.id === submitted.id && x.status === "SUBMITTED"), "expected seeded SUBMITTED report in approval queue");
+    assert.ok(
+      q.data.some((x) => x.id === submitted.id && x.status === "MANAGER_REVIEW"),
+      "expected seeded MANAGER_REVIEW report in manager approval queue"
+    );
   }
   console.log("[api-smoke] approval queue OK");
 

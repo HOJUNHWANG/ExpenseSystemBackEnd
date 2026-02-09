@@ -17,8 +17,9 @@ public enum ExpenseReportStatus {
     CFO_REVIEW,
     CEO_REVIEW,
 
-    // Policy exception flow (handled by CFO)
+    // Policy exception flow (handled by CFO or CEO depending on submitter)
     CFO_SPECIAL_REVIEW,
+    CEO_SPECIAL_REVIEW,
     CHANGES_REQUESTED,
 
     APPROVED,

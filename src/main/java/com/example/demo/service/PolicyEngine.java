@@ -14,8 +14,12 @@ import java.util.List;
  */
 public class PolicyEngine {
 
-    public static final double RECEIPT_THRESHOLD = 25.0;
-    public static final double HOTEL_NIGHTLY_LIMIT = 300.0;
+    // Demo corporate policy knobs
+    // NOTE: We intentionally do NOT implement receipt attachment in this demo.
+    public static final double HOTEL_NIGHTLY_LIMIT = 250.0;
+    public static final double ENTERTAINMENT_LIMIT = 100.0;
+    public static final double AIRFARE_LIMIT_US = 500.0;
+    public static final double AIRFARE_LIMIT_INTL = 1000.0;
     public static final double MEAL_DAILY_LIMIT = 75.0;
 
     @lombok.Builder
@@ -60,20 +64,34 @@ public class PolicyEngine {
                     }
                 }
 
-                // Receipt required
-                if (it.getAmount() >= RECEIPT_THRESHOLD) {
-                    flags.add(Warning.builder()
-                            .code("RECEIPT_REQUIRED")
-                            .message("Receipt required for expenses >= $" + (int) RECEIPT_THRESHOLD)
-                            .build());
+                // Entertainment cap
+                if (it.getCategory() != null && it.getCategory().equalsIgnoreCase("Entertainment")) {
+                    if (it.getAmount() > ENTERTAINMENT_LIMIT) {
+                        flags.add(Warning.builder()
+                                .code("ENTERTAINMENT_ABOVE_CAP")
+                                .message("Entertainment above cap ($" + (int) ENTERTAINMENT_LIMIT + ")")
+                                .build());
+                    }
                 }
 
-                // Hotel cap (best-effort heuristic)
-                if (it.getCategory() != null && it.getCategory().toLowerCase().contains("lodg")) {
+                // Hotel cap
+                if (it.getCategory() != null && (it.getCategory().equalsIgnoreCase("Hotel") || it.getCategory().toLowerCase().contains("lodg"))) {
                     if (it.getAmount() > HOTEL_NIGHTLY_LIMIT) {
                         flags.add(Warning.builder()
                                 .code("HOTEL_ABOVE_CAP")
                                 .message("Hotel above nightly cap ($" + (int) HOTEL_NIGHTLY_LIMIT + ")")
+                                .build());
+                    }
+                }
+
+                // Airfare cap (depends on destination country)
+                if (it.getCategory() != null && it.getCategory().equalsIgnoreCase("Airfare")) {
+                    boolean isUsTrip = isUnitedStatesTrip(report);
+                    double limit = isUsTrip ? AIRFARE_LIMIT_US : AIRFARE_LIMIT_INTL;
+                    if (it.getAmount() > limit) {
+                        flags.add(Warning.builder()
+                                .code("AIRFARE_ABOVE_CAP")
+                                .message("Airfare above cap ($" + (int) limit + ")")
                                 .build());
                     }
                 }
@@ -106,6 +124,18 @@ public class PolicyEngine {
         return evaluateReportWarnings(report).stream().map(Warning::getMessage).toList();
     }
 
+    private static boolean isUnitedStatesTrip(ExpenseReport report) {
+        if (report == null) return false;
+        String dest = report.getDestination();
+        if (dest == null) return false;
+        // Destination is stored as "City, Country" in this demo.
+        String[] parts = dest.split(",");
+        String country = parts.length >= 2 ? parts[parts.length - 1].trim() : dest.trim();
+        return country.equalsIgnoreCase("United States")
+                || country.equalsIgnoreCase("USA")
+                || country.equalsIgnoreCase("United States of America");
+    }
+
     private static List<Warning> dedupe(List<Warning> flags) {
         if (flags == null || flags.isEmpty()) return List.of();
         var out = new ArrayList<Warning>();
@@ -117,3 +147,4 @@ public class PolicyEngine {
         return out;
     }
 }
+

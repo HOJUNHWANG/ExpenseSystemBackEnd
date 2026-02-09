@@ -99,8 +99,8 @@ public class DemoDataService {
 
         seedSpecialReviewPending(needsFinance, employee,
                 List.of(
-                        new SeedWarning("HOTEL_ABOVE_CAP", "Hotel above nightly cap ($300)", "Client conference rate was higher."),
-                        new SeedWarning("RECEIPT_REQUIRED", "Receipt required for expenses >= $25", "Receipt will be attached in final submission.")
+                        new SeedWarning("HOTEL_ABOVE_CAP", "Hotel above nightly cap ($250)", "Client conference rate was higher."),
+                        new SeedWarning("AIRFARE_ABOVE_CAP", "Airfare above cap ($1000)", "Last-minute flight price spike.")
                 ));
 
         // 3) CHANGES_REQUESTED: finance rejected at least one exception item (includes per-item financeReason)

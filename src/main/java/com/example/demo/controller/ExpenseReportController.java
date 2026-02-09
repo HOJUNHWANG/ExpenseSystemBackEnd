@@ -41,13 +41,18 @@ public class ExpenseReportController {
         }
     }
 
-    // 🔹 새로 추가: 승인 대기중 목록 (Manager용)
+    // 🔹 승인 대기중 목록 (role-based)
+    // MANAGER -> MANAGER_REVIEW
+    // CFO     -> CFO_REVIEW
+    // CEO     -> CEO_REVIEW
     @GetMapping("/pending-approval")
-    public ResponseEntity<List<ExpenseReportListItemResponse>> listPendingApproval() {
-        return ResponseEntity.ok(expenseReportService.getReportsPendingApproval());
+    public ResponseEntity<List<ExpenseReportListItemResponse>> listPendingApproval(
+            @RequestParam String requesterRole
+    ) {
+        return ResponseEntity.ok(expenseReportService.getReportsPendingApproval(requesterRole));
     }
 
-    // Submit (routes to SUBMITTED or FINANCE_SPECIAL_REVIEW)
+    // Submit (routes to approval chain or CFO_SPECIAL_REVIEW)
     @PostMapping("/{id}/submit")
     public ResponseEntity<String> submit(@PathVariable Long id, @RequestBody com.example.demo.dto.SubmitRequest req) {
         var st = expenseReportService.submitReport(id, req);

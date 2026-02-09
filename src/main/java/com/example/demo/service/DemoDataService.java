@@ -44,10 +44,16 @@ public class DemoDataService {
                 .role("MANAGER")
                 .build());
 
-        User finance = userRepository.save(User.builder()
-                .name("Finance Lee")
+        User cfo = userRepository.save(User.builder()
+                .name("CFO Lee")
                 .email("finance@example.com")
-                .role("FINANCE")
+                .role("CFO")
+                .build());
+
+        User ceo = userRepository.save(User.builder()
+                .name("CEO Park")
+                .email("ceo@example.com")
+                .role("CEO")
                 .build());
 
         // seeded reports (cover every major workflow state)
@@ -63,14 +69,14 @@ public class DemoDataService {
                         ExpenseItem.builder().date(LocalDate.now().minusDays(2)).description("Lunch").amount(18.50).category("Meals").build()
                 ));
 
-        // 2) DRAFT (has warnings): submit requires per-warning reasons → FINANCE_SPECIAL_REVIEW
+        // 2) DRAFT (has warnings): submit requires per-warning reasons → CFO_SPECIAL_REVIEW
         // Hotel > $300/night triggers warning; also add >=$25 so receipt warning could apply depending on PolicyEngine.
         ExpenseReport needsFinance = seedReport(employee, null,
                 "Draft — Hotel Exception (needs Finance)",
                 "Boston",
                 LocalDate.now().minusDays(6),
                 LocalDate.now().minusDays(5),
-                ExpenseReportStatus.FINANCE_SPECIAL_REVIEW,
+                ExpenseReportStatus.CFO_SPECIAL_REVIEW,
                 null,
                 List.of(
                         ExpenseItem.builder().date(LocalDate.now().minusDays(6)).description("Hotel").amount(410.00).category("Lodging").build(),
@@ -96,7 +102,7 @@ public class DemoDataService {
                         ExpenseItem.builder().date(LocalDate.now().minusDays(12)).description("Dinner").amount(55.00).category("Meals").build()
                 ));
 
-        seedSpecialReviewRejected(changesRequested, employee, finance,
+        seedSpecialReviewRejected(changesRequested, employee, cfo,
                 "Please revise meals to align with policy.",
                 List.of(
                         new SeedDecision("MEALS_ABOVE_DAILY_CAP", "Meals exceed daily cap ($75)", "Team dinner during onsite work.", SpecialReviewDecision.REJECT, "Not eligible under meals policy; please split personal portion.")
@@ -108,7 +114,7 @@ public class DemoDataService {
                 "New York",
                 LocalDate.now().minusDays(4),
                 LocalDate.now().minusDays(2),
-                ExpenseReportStatus.SUBMITTED,
+                ExpenseReportStatus.MANAGER_REVIEW,
                 null,
                 List.of(
                         ExpenseItem.builder().date(LocalDate.now().minusDays(4)).description("Flight").amount(320.45).category("Travel").build(),

@@ -57,6 +57,7 @@ public class DemoDataService {
                 .build());
 
         // seeded reports (cover every major workflow state)
+
         // 1) DRAFT (no warnings): submit → approval chain
         seedReport(employee, null,
                 "Draft — Local Lunch",
@@ -67,6 +68,19 @@ public class DemoDataService {
                 null,
                 List.of(
                         ExpenseItem.builder().date(LocalDate.now().minusDays(2)).description("Lunch").amount(18.50).category("Meals").build()
+                ));
+
+        // Extra DRAFT: travel
+        seedReport(employee, null,
+                "Draft — Office Supplies",
+                "New York",
+                LocalDate.now().minusDays(1),
+                LocalDate.now().minusDays(1),
+                ExpenseReportStatus.DRAFT,
+                null,
+                List.of(
+                        ExpenseItem.builder().date(LocalDate.now().minusDays(1)).description("Monitor cable").amount(19.99).category("Office").build(),
+                        ExpenseItem.builder().date(LocalDate.now().minusDays(1)).description("Notebooks").amount(12.40).category("Office").build()
                 ));
 
         // 2) DRAFT (has warnings): submit requires per-warning reasons → CFO_SPECIAL_REVIEW
@@ -120,6 +134,55 @@ public class DemoDataService {
                         ExpenseItem.builder().date(LocalDate.now().minusDays(4)).description("Flight").amount(320.45).category("Travel").build(),
                         ExpenseItem.builder().date(LocalDate.now().minusDays(3)).description("Hotel").amount(280.00).category("Lodging").build(),
                         ExpenseItem.builder().date(LocalDate.now().minusDays(3)).description("Meals").amount(58.90).category("Meals").build()
+                ));
+
+        seedReport(employee, null,
+                "Submitted — Local Travel — NJ",
+                "New Jersey",
+                LocalDate.now().minusDays(3),
+                LocalDate.now().minusDays(3),
+                ExpenseReportStatus.MANAGER_REVIEW,
+                null,
+                List.of(
+                        ExpenseItem.builder().date(LocalDate.now().minusDays(3)).description("Mileage").amount(42.00).category("Mileage").build(),
+                        ExpenseItem.builder().date(LocalDate.now().minusDays(3)).description("Parking").amount(18.00).category("Transportation").build()
+                ));
+
+        // CFO review queue example (created by Manager)
+        seedReport(manager, null,
+                "Manager submitted — Vendor dinner",
+                "New York",
+                LocalDate.now().minusDays(5),
+                LocalDate.now().minusDays(5),
+                ExpenseReportStatus.CFO_REVIEW,
+                null,
+                List.of(
+                        ExpenseItem.builder().date(LocalDate.now().minusDays(5)).description("Team dinner with vendor").amount(210.00).category("Entertainment").build()
+                ));
+
+        // CEO review queue example (created by CFO)
+        seedReport(cfo, null,
+                "CFO submitted — Board meeting travel",
+                "Washington, DC",
+                LocalDate.now().minusDays(8),
+                LocalDate.now().minusDays(7),
+                ExpenseReportStatus.CEO_REVIEW,
+                null,
+                List.of(
+                        ExpenseItem.builder().date(LocalDate.now().minusDays(8)).description("Flight").amount(680.00).category("Travel").build(),
+                        ExpenseItem.builder().date(LocalDate.now().minusDays(7)).description("Hotel").amount(295.00).category("Lodging").build()
+                ));
+
+        // CFO review queue example (created by CEO)
+        seedReport(ceo, null,
+                "CEO submitted — Executive offsite",
+                "Boston",
+                LocalDate.now().minusDays(9),
+                LocalDate.now().minusDays(9),
+                ExpenseReportStatus.CFO_REVIEW,
+                null,
+                List.of(
+                        ExpenseItem.builder().date(LocalDate.now().minusDays(9)).description("Executive lunch").amount(96.00).category("Meals").build()
                 ));
 
         // 5) APPROVED

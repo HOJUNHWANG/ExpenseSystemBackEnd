@@ -30,7 +30,7 @@ public class SpecialReview {
     private LocalDateTime decidedAt;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    private User reviewer; // typically FINANCE
+    private User reviewer; // typically CFO
 
     private String reviewerComment; // global comment on approve/reject
 

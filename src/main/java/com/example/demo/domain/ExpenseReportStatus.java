@@ -6,10 +6,14 @@ import jakarta.persistence.Enumerated;
 public enum ExpenseReportStatus {
 
     DRAFT,
-    SUBMITTED,
 
-    // Policy exception flow
-    FINANCE_SPECIAL_REVIEW,
+    // Normal approval chain
+    MANAGER_REVIEW,
+    CFO_REVIEW,
+    CEO_REVIEW,
+
+    // Policy exception flow (handled by CFO)
+    CFO_SPECIAL_REVIEW,
     CHANGES_REQUESTED,
 
     APPROVED,

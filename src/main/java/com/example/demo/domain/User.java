@@ -20,7 +20,7 @@ public class User {
 
     private String email;     // Company Email
 
-    private String role;      // Role: EMPLOYEE, MANAGER, FINANCE etc...
+    private String role;      // Role: EMPLOYEE, MANAGER, CFO, CEO etc...
 
     // 나중에 department, status(재직/퇴사 여부) 등도 추가 가능
 }

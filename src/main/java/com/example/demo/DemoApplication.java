@@ -32,15 +32,22 @@ public class DemoApplication {
 						.role("MANAGER")
 						.build();
 
-				User finance = User.builder()
-						.name("Finance Lee")
+				User cfo = User.builder()
+						.name("CFO Lee")
 						.email("finance@example.com")
-						.role("FINANCE")
+						.role("CFO")
+						.build();
+
+				User ceo = User.builder()
+						.name("CEO Park")
+						.email("ceo@example.com")
+						.role("CEO")
 						.build();
 
 				userRepository.save(employee);
 				userRepository.save(manager);
-				userRepository.save(finance);
+				userRepository.save(cfo);
+				userRepository.save(ceo);
 
 				System.out.println("👉 Seed users created.");
 			}

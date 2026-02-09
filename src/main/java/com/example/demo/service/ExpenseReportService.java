@@ -194,7 +194,7 @@ public class ExpenseReportService {
     /**
      * Demo-friendly search endpoint.
      *
-     * If requesterRole is not MANAGER/FINANCE, results are restricted to requesterId (submitter).
+     * If requesterRole is not MANAGER/CFO/CEO, results are restricted to requesterId (submitter).
      */
     public List<ExpenseReportListItemResponse> searchReports(Long requesterId, String requesterRole, String q, String status, Double minTotal, Double maxTotal, String sort) {
         boolean approver = requesterRole != null && (

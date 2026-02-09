@@ -88,7 +88,7 @@ public class ExpenseReportController {
      * Demo-friendly search.
      *
      * - EMPLOYEE: can only search their own reports
-     * - MANAGER/FINANCE: can search all reports
+     * - MANAGER/CFO/CEO: can search all reports
      */
     @GetMapping("/search")
     public ResponseEntity<List<ExpenseReportListItemResponse>> search(

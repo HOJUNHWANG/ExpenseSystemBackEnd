@@ -57,7 +57,7 @@ public class DemoDataService {
                 .build());
 
         // seeded reports (cover every major workflow state)
-        // 1) DRAFT (no warnings): can submit directly → SUBMITTED
+        // 1) DRAFT (no warnings): submit → approval chain
         seedReport(employee, null,
                 "Draft — Local Lunch",
                 "New York",
@@ -108,7 +108,7 @@ public class DemoDataService {
                         new SeedDecision("MEALS_ABOVE_DAILY_CAP", "Meals exceed daily cap ($75)", "Team dinner during onsite work.", SpecialReviewDecision.REJECT, "Not eligible under meals policy; please split personal portion.")
                 ));
 
-        // 4) SUBMITTED (pending manager approval): keep approval queue populated
+        // 4) MANAGER_REVIEW (pending manager approval): keep approval queue populated
         seedReport(employee, null,
                 "Submitted — NYC Trip",
                 "New York",

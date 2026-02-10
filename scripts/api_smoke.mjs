@@ -285,8 +285,6 @@ async function main() {
     const employee2 = await login("jun@example.com");
     const manager2 = await login("manager@example.com");
     const cfo2 = await login("finance@example.com");
-    const ceo2 = await login("ceo@example.com");
-
     // Create an exception report (Hotel cap is 250; set 400 to trigger warning)
     const id = await createReport({
       submitterId: employee2.id,
@@ -348,17 +346,13 @@ async function main() {
     await expectOk(s2, "resubmit fixed report failed");
     assert.equal(s2.data, "MANAGER_REVIEW");
 
-    // Normal approval chain: manager -> CFO -> CEO -> APPROVED
+    // Normal approval chain (employee submitter): manager -> CFO -> APPROVED
     const a1 = await approveReport(id, { approverId: manager2.id, approverRole: "MANAGER", comment: "OK" });
     await expectOk(a1, "manager approve failed");
     assert.equal((await getReport(id)).status, "CFO_REVIEW");
 
     const a2 = await approveReport(id, { approverId: cfo2.id, approverRole: "CFO", comment: "OK" });
     await expectOk(a2, "cfo approve failed");
-    assert.equal((await getReport(id)).status, "CEO_REVIEW");
-
-    const a3 = await approveReport(id, { approverId: ceo2.id, approverRole: "CEO", comment: "OK" });
-    await expectOk(a3, "ceo approve failed");
     assert.equal((await getReport(id)).status, "APPROVED");
   }
   console.log("[api-smoke] exception loop + approve chain OK");

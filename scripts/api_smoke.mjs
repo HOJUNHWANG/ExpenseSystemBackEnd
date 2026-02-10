@@ -180,7 +180,57 @@ async function main() {
   }
   console.log("[api-smoke] CFO reject validation OK");
 
-  // 6) Existing CHANGES_REQUESTED has feedback visible to submitter
+  // 6) CFO special review approve path routes back into normal queue
+  {
+    // reset again for a clean approve scenario
+    await resetDemo();
+
+    const employee2 = await login("jun@example.com");
+    const manager2 = await login("manager@example.com");
+    const cfo2 = await login("finance@example.com");
+
+    const all2 = await searchAllAs(manager2);
+    const exceptionReport = findByTitle(all2, "Draft — Hotel Exception (needs Finance)");
+
+    const r0 = await getReport(exceptionReport.id);
+    assert.equal(r0.status, "CFO_SPECIAL_REVIEW");
+
+    const review = await getSpecialReview(exceptionReport.id);
+    assert.equal(review.status, "PENDING");
+    assert.ok(review.items?.length >= 1, "special review should have items");
+
+    const ok = await decideSpecialReview(exceptionReport.id, {
+      reviewerId: cfo2.id,
+      reviewerRole: "CFO",
+      reviewerComment: "Approved exceptions for demo.",
+      decisions: review.items.map((it) => ({
+        code: it.code,
+        decision: "APPROVE",
+        financeReason: "OK",
+      })),
+    });
+    await expectOk(ok, "decide special review (approve) failed");
+    assert.equal(ok.data, "MANAGER_REVIEW");
+
+    const r1 = await getReport(exceptionReport.id);
+    assert.equal(r1.status, "MANAGER_REVIEW");
+
+    // special review should be deleted on approve
+    const srAfter = await http(`/api/expense-reports/${exceptionReport.id}/special-review`);
+    assert.equal(srAfter.ok, false);
+    assert.equal(srAfter.status, 400);
+
+    // manager queue should contain the report now
+    const q = await http("/api/expense-reports/pending-approval?requesterRole=MANAGER");
+    await expectOk(q, "pending approval fetch failed");
+    assert.ok(q.data.some((x) => x.id === exceptionReport.id && x.status === "MANAGER_REVIEW"));
+
+    // keep employee2 referenced to avoid lint confusion
+    assert.ok(employee2.id);
+  }
+  console.log("[api-smoke] exception review approve path OK");
+
+  // 7) Existing CHANGES_REQUESTED has feedback visible to submitter
   {
     const r = await http(`/api/expense-reports/${changesReq.id}/submitter-feedback?requesterId=${employee.id}`);
     await expectOk(r, "submitter feedback fetch failed");

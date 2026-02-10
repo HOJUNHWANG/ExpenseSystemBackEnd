@@ -11,7 +11,7 @@ This doc is a practical test plan for the **public demo workflow** (1-person, 3-
 ### Accounts (seeded by `/api/demo/reset`)
 - Employee: `jun@example.com`
 - Manager: `manager@example.com`
-- Finance: `finance@example.com`
+- CFO: `finance@example.com`
 
 ### Key URLs
 - Frontend: (your Vercel URL)
@@ -83,10 +83,10 @@ After reset, seeded reports cover all major states:
    - status becomes `APPROVED`
    - it appears in Recent activity as Approved
 
-### D. Employee: Finance changes requested → edit → resubmit loop
+### D. Employee: CFO changes requested → edit → resubmit loop
 1. Role: **Employee**
 2. Open `Changes requested — Meals cap exception`
-3. Expect: a **Finance requested changes** panel is visible
+3. Expect: a **CFO requested changes** panel is visible
 4. Click **Edit**, adjust items so meals total <= $75/day (or otherwise resolve)
 5. Save changes
 6. Click **Submit**
@@ -94,8 +94,8 @@ After reset, seeded reports cover all major states:
    - if no warnings remain → `SUBMITTED`
    - if warnings remain → modal requires per-warning reasons
 
-### E. Finance: Special approval decision validation (must provide per-item reason on reject)
-1. Role: **Finance**
+### E. CFO: Exception review decision validation (must provide per-item reason on reject)
+1. Role: **CFO**
 2. Open a report in `FINANCE_SPECIAL_REVIEW`
 3. Choose `✕ Reject` for one warning item
 4. Leave that item’s finance note empty
@@ -114,8 +114,8 @@ After reset, seeded reports cover all major states:
 3. Search a keyword unique to another user (if added later) or verify results are only submitter-owned.
 4. Expect: only own reports are returned.
 
-### B. Manager/Finance scope
-1. Role: Manager or Finance
+### B. Manager/CFO scope
+1. Role: Manager or CFO
 2. Go to `/search`
 3. Expect: can see all reports (within demo DB), and status filter/sort works.
 
@@ -146,13 +146,13 @@ curl -sS "$BASE/api/expense-reports/pending-approval"
 ```
 Expect: list includes at least 1 `SUBMITTED`.
 
-### D. Get special review
+### D. Get exception review (API path: /special-review)
 ```bash
 curl -sS "$BASE/api/expense-reports/{id}/special-review"
 ```
 Expect: `items[]` with warning `code`s.
 
-### E. Decide special review — negative validation
+### E. Decide exception review — negative validation (API path: /special-review/decide)
 - If any decision is `REJECT`, that item must include `financeReason`.
 - If any reject exists, request must include non-empty `reviewerComment`.
 
@@ -163,8 +163,8 @@ Expect: `items[]` with warning `code`s.
 - [ ] DRAFT create/save works
 - [ ] Submit DRAFT without warnings → SUBMITTED
 - [ ] Submit with warnings requires reasons → FINANCE_SPECIAL_REVIEW
-- [ ] Finance reject requires per-item financeReason + global reviewerComment
+- [ ] CFO reject requires per-item financeReason + global reviewerComment
 - [ ] Any finance reject → CHANGES_REQUESTED + feedback visible to submitter
-- [ ] Finance all approve → special review deleted + report → SUBMITTED
+- [ ] CFO all approve → exception review deleted + report routes into normal approval chain
 - [ ] Approval queue only shows SUBMITTED
 - [ ] Mobile: header menu works and tables don’t overflow

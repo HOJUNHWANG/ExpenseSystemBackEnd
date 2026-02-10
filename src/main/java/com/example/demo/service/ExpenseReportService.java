@@ -280,8 +280,9 @@ public class ExpenseReportService {
     }
 
     /**
-     * Submit report.
-     * If policy warnings exist, creates/updates a SpecialReview and routes to CFO_SPECIAL_REVIEW.
+     * Update a report.
+     *
+     * Allowed only for the submitter when the report is in DRAFT or CHANGES_REQUESTED.
      */
     public ExpenseReportStatus updateReport(Long reportId, com.example.demo.dto.ExpenseReportUpdateRequest req) {
         ExpenseReport report = expenseReportRepository.findById(reportId)
@@ -345,7 +346,7 @@ public class ExpenseReportService {
 
         var warnings = PolicyEngine.evaluateReportWarnings(report);
         if (warnings.isEmpty()) {
-            // Clear any previous special review
+            // Clear any previous exception-review record
             specialReviewRepository.findByReportId(reportId).ifPresent(specialReviewRepository::delete);
 
             // Route into normal approval chain based on submitter role.
@@ -411,9 +412,9 @@ public class ExpenseReportService {
 
         specialReviewRepository.save(review);
 
-        // Special review reviewer depends on who submitted:
-        // - If CFO submits and still has exceptions, CEO should special-review
-        // - Otherwise CFO special-reviews
+        // Exception review reviewer depends on who submitted:
+        // - If CFO submits and still has exceptions, CEO reviews the exception
+        // - Otherwise CFO reviews the exception
         String role = report.getSubmitter() != null ? report.getSubmitter().getRole() : null;
         if (role != null && role.equalsIgnoreCase("CFO")) {
             report.setStatus(ExpenseReportStatus.CEO_SPECIAL_REVIEW);
@@ -548,7 +549,7 @@ public class ExpenseReportService {
             return report.getStatus();
         }
 
-        // Approved special review: clear special review records and route to normal approval chain.
+        // Approved exception review: clear review records and route to normal approval chain.
         specialReviewRepository.delete(review);
 
         String role = report.getSubmitter() != null ? report.getSubmitter().getRole() : null;
@@ -643,7 +644,7 @@ public class ExpenseReportService {
             throw new IllegalStateException("Only DRAFT reports can be deleted.");
         }
 
-        // If a special review exists for some reason, delete it too.
+        // If an exception review exists for some reason, delete it too.
         specialReviewRepository.findByReportId(reportId).ifPresent(specialReviewRepository::delete);
         expenseReportRepository.delete(report);
     }

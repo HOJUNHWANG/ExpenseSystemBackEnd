@@ -59,7 +59,7 @@ public class ExpenseReportController {
         return ResponseEntity.ok(st.name());
     }
 
-    // CFO/Finance: view exception review details (API path kept as /special-review for backward compatibility)
+    // CFO: view exception review details (API path kept as /special-review for backward compatibility)
     @GetMapping("/{id}/special-review")
     public ResponseEntity<com.example.demo.dto.SpecialReviewResponse> getExceptionReview(@PathVariable Long id) {
         return ResponseEntity.ok(expenseReportService.getExceptionReview(id));
@@ -74,7 +74,7 @@ public class ExpenseReportController {
         return ResponseEntity.ok(expenseReportService.getSubmitterFeedback(id, requesterId));
     }
 
-    // CFO/Finance: decide exception review (approve/reject per item) (API path kept as /special-review)
+    // CFO: decide exception review (approve/reject per item) (API path kept as /special-review)
     @PostMapping("/{id}/special-review/decide")
     public ResponseEntity<String> decideExceptionReview(
             @PathVariable Long id,

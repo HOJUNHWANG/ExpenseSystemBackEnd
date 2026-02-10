@@ -424,7 +424,7 @@ public class ExpenseReportService {
         return report.getStatus();
     }
 
-    public com.example.demo.dto.SpecialReviewResponse getSpecialReview(Long reportId) {
+    public com.example.demo.dto.SpecialReviewResponse getExceptionReview(Long reportId) {
         var review = specialReviewRepository.findByReportId(reportId)
                 .orElseThrow(() -> new IllegalArgumentException("Special review not found for report: " + reportId));
 
@@ -478,7 +478,7 @@ public class ExpenseReportService {
                 .build();
     }
 
-    public ExpenseReportStatus decideSpecialReview(Long reportId, com.example.demo.dto.SpecialReviewDecisionRequest req) {
+    public ExpenseReportStatus decideExceptionReview(Long reportId, com.example.demo.dto.SpecialReviewDecisionRequest req) {
         ExpenseReport report = expenseReportRepository.findById(reportId)
                 .orElseThrow(() -> new IllegalArgumentException("Report not found: " + reportId));
 

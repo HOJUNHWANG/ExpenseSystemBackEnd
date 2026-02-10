@@ -180,7 +180,32 @@ async function main() {
   }
   console.log("[api-smoke] CFO reject validation OK");
 
-  // 6) CFO special review approve path routes back into normal queue
+  // 6) Existing CHANGES_REQUESTED has feedback visible to submitter
+  {
+    const r = await http(`/api/expense-reports/${changesReq.id}/submitter-feedback?requesterId=${employee.id}`);
+    await expectOk(r, "submitter feedback fetch failed");
+    assert.equal(r.data?.specialReviewStatus, "REJECTED");
+    assert.ok(r.data?.reviewerComment, "feedback should include reviewerComment");
+    assert.ok(
+      r.data?.items?.some((x) => x.financeDecision === "REJECT" && x.financeReason),
+      "feedback should include rejected item financeReason"
+    );
+  }
+  console.log("[api-smoke] changes-requested feedback OK");
+
+  // 7) Approval queue contains MANAGER_REVIEW report (manager view)
+  {
+    const q = await http("/api/expense-reports/pending-approval?requesterRole=MANAGER");
+    await expectOk(q, "pending approval fetch failed");
+    assert.ok(Array.isArray(q.data), "pending-approval should return array");
+    assert.ok(
+      q.data.some((x) => x.id === submitted.id && x.status === "MANAGER_REVIEW"),
+      "expected seeded MANAGER_REVIEW report in manager approval queue"
+    );
+  }
+  console.log("[api-smoke] approval queue OK");
+
+  // 8) Exception review approve path routes back into normal queue
   {
     // reset again for a clean approve scenario
     await resetDemo();
@@ -221,39 +246,13 @@ async function main() {
     assert.equal(srAfter.status, 400);
 
     // manager queue should contain the report now
-    const q = await http("/api/expense-reports/pending-approval?requesterRole=MANAGER");
-    await expectOk(q, "pending approval fetch failed");
-    assert.ok(q.data.some((x) => x.id === exceptionReport.id && x.status === "MANAGER_REVIEW"));
+    const q2 = await http("/api/expense-reports/pending-approval?requesterRole=MANAGER");
+    await expectOk(q2, "pending approval fetch failed");
+    assert.ok(q2.data.some((x) => x.id === exceptionReport.id && x.status === "MANAGER_REVIEW"));
 
-    // keep employee2 referenced to avoid lint confusion
     assert.ok(employee2.id);
   }
   console.log("[api-smoke] exception review approve path OK");
-
-  // 7) Existing CHANGES_REQUESTED has feedback visible to submitter
-  {
-    const r = await http(`/api/expense-reports/${changesReq.id}/submitter-feedback?requesterId=${employee.id}`);
-    await expectOk(r, "submitter feedback fetch failed");
-    assert.equal(r.data?.specialReviewStatus, "REJECTED");
-    assert.ok(r.data?.reviewerComment, "feedback should include reviewerComment");
-    assert.ok(
-      r.data?.items?.some((x) => x.financeDecision === "REJECT" && x.financeReason),
-      "feedback should include rejected item financeReason"
-    );
-  }
-  console.log("[api-smoke] changes-requested feedback OK");
-
-  // 7) Approval queue contains MANAGER_REVIEW report (manager view)
-  {
-    const q = await http("/api/expense-reports/pending-approval?requesterRole=MANAGER");
-    await expectOk(q, "pending approval fetch failed");
-    assert.ok(Array.isArray(q.data), "pending-approval should return array");
-    assert.ok(
-      q.data.some((x) => x.id === submitted.id && x.status === "MANAGER_REVIEW"),
-      "expected seeded MANAGER_REVIEW report in manager approval queue"
-    );
-  }
-  console.log("[api-smoke] approval queue OK");
 
   console.log("[api-smoke] ✅ ALL OK");
 }

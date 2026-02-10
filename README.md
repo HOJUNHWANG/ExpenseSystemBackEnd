@@ -7,7 +7,7 @@ Spring Boot backend for a public portfolio demo of an internal expense workflow.
 - Submit:
   - If no policy warnings → SUBMITTED (normal manager queue)
   - If policy warnings → employee must provide per-warning reasons → FINANCE_SPECIAL_REVIEW
-- Finance special approval:
+- CFO exception review (policy exceptions):
   - All approve → SUBMITTED and exception data is cleared
   - Any reject → CHANGES_REQUESTED (submitter can edit and resubmit)
 

@@ -99,6 +99,27 @@ async function submitReport(id, payload) {
   return r;
 }
 
+async function createReport(payload) {
+  const r = await http("/api/expense-reports", { method: "POST", body: payload });
+  await expectOk(r, "create report failed");
+  return r.data;
+}
+
+async function updateReport(id, payload) {
+  const r = await http(`/api/expense-reports/${id}`, { method: "PUT", body: payload });
+  return r;
+}
+
+async function approveReport(id, payload) {
+  const r = await http(`/api/expense-reports/${id}/approve`, { method: "POST", body: payload });
+  return r;
+}
+
+async function rejectReport(id, payload) {
+  const r = await http(`/api/expense-reports/${id}/reject`, { method: "POST", body: payload });
+  return r;
+}
+
 async function main() {
   console.log(`[api-smoke] BASE_URL=${BASE}`);
 
@@ -110,6 +131,7 @@ async function main() {
   const employee = await login("jun@example.com");
   const manager = await login("manager@example.com");
   const cfo = await login("finance@example.com");
+  const ceo = await login("ceo@example.com");
   console.log("[api-smoke] login OK");
 
   // 3) Seed sanity via search (manager sees all)
@@ -253,6 +275,93 @@ async function main() {
     assert.ok(employee2.id);
   }
   console.log("[api-smoke] exception review approve path OK");
+
+
+
+  // 8) Full loop: exception reject -> changes requested -> fix -> resubmit -> approve chain
+  {
+    await resetDemo();
+
+    const employee2 = await login("jun@example.com");
+    const manager2 = await login("manager@example.com");
+    const cfo2 = await login("finance@example.com");
+    const ceo2 = await login("ceo@example.com");
+
+    // Create an exception report (Hotel cap is 250; set 400 to trigger warning)
+    const id = await createReport({
+      submitterId: employee2.id,
+      title: "API Smoke — Hotel Exception Loop",
+      destination: "Boston, United States",
+      departureDate: "2026-01-10",
+      returnDate: "2026-01-10",
+      items: [
+        { date: "2026-01-10", description: "Hotel night", amount: 400, category: "Hotel" },
+      ],
+    });
+
+    const s1 = await submitReport(id, { submitterId: employee2.id, reasons: [] });
+    await expectOk(s1, "submit exception report failed");
+    assert.equal(s1.data, "CFO_SPECIAL_REVIEW");
+
+    const review = await getSpecialReview(id);
+    assert.ok(review.items?.length >= 1);
+
+    // CFO rejects (requires per-item reason + overall comment)
+    const bad = await decideSpecialReview(id, {
+      reviewerId: cfo2.id,
+      reviewerRole: "CFO",
+      reviewerComment: "Please revise and resubmit.",
+      decisions: review.items.map((it) => ({ code: it.code, decision: "REJECT", financeReason: "" })),
+    });
+    assert.equal(bad.ok, false);
+    assert.equal(bad.status, 400);
+
+    const good = await decideSpecialReview(id, {
+      reviewerId: cfo2.id,
+      reviewerRole: "CFO",
+      reviewerComment: "Please reduce the amount or provide justification.",
+      decisions: review.items.map((it) => ({ code: it.code, decision: "REJECT", financeReason: "Over cap." })),
+    });
+    await expectOk(good, "decide special review reject failed");
+    assert.equal(good.data, "CHANGES_REQUESTED");
+
+    // Submitter can fetch feedback
+    const fb = await http(`/api/expense-reports/${id}/submitter-feedback?requesterId=${employee2.id}`);
+    await expectOk(fb, "submitter feedback fetch failed");
+    assert.equal(fb.data?.specialReviewStatus, "REJECTED");
+
+    // Fix the report: reduce hotel amount to pass policy
+    const up = await updateReport(id, {
+      requesterId: employee2.id,
+      title: "API Smoke — Hotel Fixed",
+      destination: "Boston, United States",
+      departureDate: "2026-01-10",
+      returnDate: "2026-01-10",
+      items: [
+        { date: "2026-01-10", description: "Hotel night (fixed)", amount: 240, category: "Hotel" },
+      ],
+    });
+    await expectOk(up, "update changes requested failed");
+    assert.equal(up.data, "CHANGES_REQUESTED");
+
+    const s2 = await submitReport(id, { submitterId: employee2.id, reasons: [] });
+    await expectOk(s2, "resubmit fixed report failed");
+    assert.equal(s2.data, "MANAGER_REVIEW");
+
+    // Normal approval chain: manager -> CFO -> CEO -> APPROVED
+    const a1 = await approveReport(id, { approverId: manager2.id, approverRole: "MANAGER", comment: "OK" });
+    await expectOk(a1, "manager approve failed");
+    assert.equal((await getReport(id)).status, "CFO_REVIEW");
+
+    const a2 = await approveReport(id, { approverId: cfo2.id, approverRole: "CFO", comment: "OK" });
+    await expectOk(a2, "cfo approve failed");
+    assert.equal((await getReport(id)).status, "CEO_REVIEW");
+
+    const a3 = await approveReport(id, { approverId: ceo2.id, approverRole: "CEO", comment: "OK" });
+    await expectOk(a3, "ceo approve failed");
+    assert.equal((await getReport(id)).status, "APPROVED");
+  }
+  console.log("[api-smoke] exception loop + approve chain OK");
 
   console.log("[api-smoke] ✅ ALL OK");
 }

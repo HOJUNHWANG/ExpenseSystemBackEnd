@@ -332,7 +332,7 @@ async function main() {
 
     // Fix the report: reduce hotel amount to pass policy
     const up = await updateReport(id, {
-      requesterId: employee2.id,
+      submitterId: employee2.id,
       title: "API Smoke — Hotel Fixed",
       destination: "Boston, United States",
       departureDate: "2026-01-10",

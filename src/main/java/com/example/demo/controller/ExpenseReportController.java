@@ -59,10 +59,10 @@ public class ExpenseReportController {
         return ResponseEntity.ok(st.name());
     }
 
-    // Finance: view special review details
+    // CFO/Finance: view exception review details (API path kept as /special-review for backward compatibility)
     @GetMapping("/{id}/special-review")
-    public ResponseEntity<com.example.demo.dto.SpecialReviewResponse> getSpecialReview(@PathVariable Long id) {
-        return ResponseEntity.ok(expenseReportService.getSpecialReview(id));
+    public ResponseEntity<com.example.demo.dto.SpecialReviewResponse> getExceptionReview(@PathVariable Long id) {
+        return ResponseEntity.ok(expenseReportService.getExceptionReview(id));
     }
 
     // Submitter: view feedback (after CHANGES_REQUESTED)
@@ -74,13 +74,13 @@ public class ExpenseReportController {
         return ResponseEntity.ok(expenseReportService.getSubmitterFeedback(id, requesterId));
     }
 
-    // Finance: decide special review (approve/reject per item)
+    // CFO/Finance: decide exception review (approve/reject per item) (API path kept as /special-review)
     @PostMapping("/{id}/special-review/decide")
-    public ResponseEntity<String> decideSpecialReview(
+    public ResponseEntity<String> decideExceptionReview(
             @PathVariable Long id,
             @RequestBody com.example.demo.dto.SpecialReviewDecisionRequest req
     ) {
-        var st = expenseReportService.decideSpecialReview(id, req);
+        var st = expenseReportService.decideExceptionReview(id, req);
         return ResponseEntity.ok(st.name());
     }
 

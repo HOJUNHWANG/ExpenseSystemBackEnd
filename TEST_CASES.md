@@ -1,6 +1,6 @@
 # Company Ops Demo — End-to-End Test Cases
 
-This doc is a practical test plan for the **public demo workflow** (1-person, 3-role switch) and the core APIs.
+This doc is a practical test plan for the **public demo workflow** (1-person, multi-role switch) and the core APIs.
 
 > Tip: Always start by resetting demo data so IDs/statuses are predictable.
 
@@ -12,6 +12,7 @@ This doc is a practical test plan for the **public demo workflow** (1-person, 3-
 - Employee: `jun@example.com`
 - Manager: `manager@example.com`
 - CFO: `finance@example.com`
+- CEO: `ceo@example.com`
 
 ### Key URLs
 - Frontend: (your Vercel URL)
@@ -23,29 +24,30 @@ This doc is a practical test plan for the **public demo workflow** (1-person, 3-
 
 ---
 
-## 1) Seeded default data (what should exist after reset)
+## 1) Seeded default data (after reset)
 
-After reset, seeded reports cover all major states:
+After reset, seeded reports cover major states:
 
-1) **DRAFT** (no warnings)
+1) **DRAFT** (policy-clean)
    - Title: `Draft — Local Lunch`
-   - Purpose: submit directly → SUBMITTED
+   - Expect: submit → `MANAGER_REVIEW`
 
-2) **FINANCE_SPECIAL_REVIEW** (pending)
-   - Title: `Draft — Hotel Exception (needs Finance)`
-   - Has `SpecialReview` in `PENDING` with items for warning codes:
+2) **CFO_SPECIAL_REVIEW** (exception review pending)
+   - Title: `Draft — Hotel Exception (needs Finance)` *(seed title kept)*
+   - Has exception review items (examples):
      - `HOTEL_ABOVE_CAP`
-     - `RECEIPT_REQUIRED`
+     - `MEALS_ABOVE_DAILY_CAP`
+     - `ENTERTAINMENT_ABOVE_CAP`
+     - `AIRFARE_ABOVE_CAP`
+     - `ITEM_DATE_OUTSIDE_TRIP`
 
-3) **CHANGES_REQUESTED** (finance already rejected at least one item)
+3) **CHANGES_REQUESTED** (exception review rejected)
    - Title: `Changes requested — Meals cap exception`
-   - Has `SpecialReview` in `REJECTED` with at least one item:
-     - code `MEALS_ABOVE_DAILY_CAP`
-     - has **financeDecision=REJECT** and **financeReason present**
-     - has global **reviewerComment present**
+   - Feedback visible to submitter via:
+     - `GET /api/expense-reports/{id}/submitter-feedback?requesterId=...`
 
-4) **SUBMITTED** (pending manager approval)
-   - Title: `Submitted — NYC Trip`
+4) **MANAGER_REVIEW** (pending manager approval)
+   - Title: `Submitted — NYC Trip` *(seed title kept)*
 
 5) **APPROVED**
    - Title: `Approved — Client Visit`
@@ -63,7 +65,7 @@ After reset, seeded reports cover all major states:
 3. Expect:
    - demo reset occurs
    - logged in as Employee (Role Switcher shows Employee)
-   - you land on reports/dashboard without errors
+   - app renders without errors
 
 ### B. Employee: Submit a clean DRAFT (no exceptions)
 1. Role: **Employee**
@@ -71,33 +73,39 @@ After reset, seeded reports cover all major states:
 3. Open report `Draft — Local Lunch`
 4. Click **Submit**
 5. Expect:
-   - status changes to `SUBMITTED`
+   - status changes to `MANAGER_REVIEW`
    - report appears in **Approval Queue** when viewing as Manager
 
-### C. Manager: Approve a SUBMITTED report
+### C. Manager: Approve a `MANAGER_REVIEW` report
 1. Role: **Manager**
 2. Go to **Approval Queue**
 3. Open `Submitted — NYC Trip`
 4. Approve with a comment
 5. Expect:
-   - status becomes `APPROVED`
-   - it appears in Recent activity as Approved
+   - status becomes `CFO_REVIEW`
 
-### D. Employee: CFO changes requested → edit → resubmit loop
+### D. CFO: Final approve (employee submitter)
+1. Role: **CFO**
+2. Go to **Approval Queue**
+3. Approve the report you just moved to `CFO_REVIEW`
+4. Expect:
+   - status becomes `APPROVED`
+
+### E. Employee: CFO changes requested → edit → resubmit loop
 1. Role: **Employee**
 2. Open `Changes requested — Meals cap exception`
 3. Expect: a **CFO requested changes** panel is visible
-4. Click **Edit**, adjust items so meals total <= $75/day (or otherwise resolve)
+4. Click **Edit**, adjust items so warnings resolve (e.g. meals total <= $75/day)
 5. Save changes
 6. Click **Submit**
 7. Expect:
-   - if no warnings remain → `SUBMITTED`
-   - if warnings remain → modal requires per-warning reasons
+   - if no warnings remain → routes into the normal approval chain (`MANAGER_REVIEW`)
+   - if warnings remain → report routes to exception review (`CFO_SPECIAL_REVIEW` or `CEO_SPECIAL_REVIEW`)
 
-### E. CFO: Exception review decision validation (must provide per-item reason on reject)
+### F. CFO: Exception review decision validation
 1. Role: **CFO**
-2. Open a report in `FINANCE_SPECIAL_REVIEW`
-3. Choose `✕ Reject` for one warning item
+2. Open a report in `CFO_SPECIAL_REVIEW`
+3. Choose `Reject` for one warning item
 4. Leave that item’s finance note empty
 5. Attempt to submit decision
 6. Expect:
@@ -111,11 +119,10 @@ After reset, seeded reports cover all major states:
 ### A. Employee scope
 1. Role: Employee
 2. Go to `/search`
-3. Search a keyword unique to another user (if added later) or verify results are only submitter-owned.
-4. Expect: only own reports are returned.
+3. Expect: only own reports are returned.
 
-### B. Manager/CFO scope
-1. Role: Manager or CFO
+### B. Manager/CFO/CEO scope
+1. Role: Manager or CFO or CEO
 2. Go to `/search`
 3. Expect: can see all reports (within demo DB), and status filter/sort works.
 
@@ -142,17 +149,18 @@ Expect: user object with `id`, `role`.
 
 ### C. Pending approval list
 ```bash
-curl -sS "$BASE/api/expense-reports/pending-approval"
+curl -sS "$BASE/api/expense-reports/pending-approval?requesterRole=MANAGER"
 ```
-Expect: list includes at least 1 `SUBMITTED`.
+Expect: list includes items in `MANAGER_REVIEW`.
 
-### D. Get exception review (API path: /special-review)
+### D. Get exception review (API path kept as /special-review)
 ```bash
 curl -sS "$BASE/api/expense-reports/{id}/special-review"
 ```
 Expect: `items[]` with warning `code`s.
 
-### E. Decide exception review — negative validation (API path: /special-review/decide)
+### E. Decide exception review — negative validation
+API path: `/special-review/decide`
 - If any decision is `REJECT`, that item must include `financeReason`.
 - If any reject exists, request must include non-empty `reviewerComment`.
 
@@ -161,10 +169,10 @@ Expect: `items[]` with warning `code`s.
 ## 5) Regression Checklist (quick)
 - [ ] `/api/demo/reset` works on Postgres (no FK violations)
 - [ ] DRAFT create/save works
-- [ ] Submit DRAFT without warnings → SUBMITTED
-- [ ] Submit with warnings requires reasons → FINANCE_SPECIAL_REVIEW
-- [ ] CFO reject requires per-item financeReason + global reviewerComment
-- [ ] Any finance reject → CHANGES_REQUESTED + feedback visible to submitter
-- [ ] CFO all approve → exception review deleted + report routes into normal approval chain
-- [ ] Approval queue only shows SUBMITTED
+- [ ] Submit DRAFT without warnings → routes into normal chain (`MANAGER_REVIEW` for employee)
+- [ ] Submit with warnings → exception review (`CFO_SPECIAL_REVIEW` / `CEO_SPECIAL_REVIEW`)
+- [ ] Reject in exception review requires per-item `financeReason` + global `reviewerComment`
+- [ ] Any reject → `CHANGES_REQUESTED` + feedback visible to submitter
+- [ ] All approve → exception review deleted + report routes into normal approval chain
+- [ ] Approval queue is role-based via `requesterRole`
 - [ ] Mobile: header menu works and tables don’t overflow

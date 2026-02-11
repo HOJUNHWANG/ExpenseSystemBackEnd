@@ -27,7 +27,8 @@ import java.util.concurrent.ConcurrentHashMap;
 @Component
 public class RateLimitFilter extends OncePerRequestFilter {
 
-    @Value("${demo.guard.enabled:true}")
+    // Enable only in prod by default (can be turned on explicitly via env var).
+    @Value("${demo.guard.enabled:false}")
     private boolean enabled;
 
     // Demo reset endpoint is the most sensitive.

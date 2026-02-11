@@ -1,5 +1,9 @@
 server:
   port: ${PORT:8080}
+  # Basic request-size limits (public demo)
+  tomcat:
+    max-http-form-post-size: 262144   # 256KB
+    max-swallow-size: 262144         # 256KB
 
 spring:
   datasource:
@@ -16,6 +20,12 @@ spring:
       hibernate:
         format_sql: false
 
+  servlet:
+    multipart:
+      enabled: false
+      max-file-size: 0
+      max-request-size: 0
+
 # Public demo behavior
 demo:
   reset:
@@ -27,3 +37,15 @@ app:
   cors:
     # comma-separated allowlist. Example: "https://your-vercel-app.vercel.app,https://expense.yourdomain.com"
     allowed-origins: ${APP_CORS_ALLOWED_ORIGINS:*}
+
+# Public demo safety guards (rate limits)
+demo:
+  guard:
+    enabled: ${DEMO_GUARD_ENABLED:true}
+    reset:
+      # per IP
+      max-per-minute: ${DEMO_GUARD_RESET_MAX_PER_MINUTE:6}
+      cooldown-seconds: ${DEMO_GUARD_RESET_COOLDOWN_SECONDS:20}
+    writes:
+      # per IP, for POST/PUT/DELETE under /api/*
+      max-per-minute: ${DEMO_GUARD_WRITES_MAX_PER_MINUTE:120}

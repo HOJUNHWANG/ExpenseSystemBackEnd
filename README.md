@@ -57,6 +57,17 @@ H2 console (dev only): `http://localhost:8080/h2-console`
 - `POST /api/demo/reset` — wipes + seeds demo users and sample reports
 - `POST /api/auth/login` — demo-friendly login by email
 
+## Testing
+- API smoke test:
+  ```bash
+  # Local
+  BASE_URL=http://localhost:8080 node scripts/api_smoke.mjs
+
+  # Deployed (Render)
+  BASE_URL=https://company-ops-demo-api.onrender.com node scripts/api_smoke.mjs
+  ```
+  > Note: Render may cold-start; the first call can take a bit longer.
+
 ## Profiles
 
 ### `default` (local/dev)

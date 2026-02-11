@@ -3,11 +3,16 @@
  * API smoke test for Company Ops Demo.
  *
  * Usage:
+ *   # Local (requires backend running):
+ *   BASE_URL=http://localhost:8080 node scripts/api_smoke.mjs
+ *
+ *   # Deployed (Render):
  *   BASE_URL=https://company-ops-demo-api.onrender.com node scripts/api_smoke.mjs
  *
  * Notes:
  * - This is a smoke test (fast + practical), not exhaustive.
  * - It validates the core demo workflow rules and key endpoints.
+ * - Deployed environments (e.g. Render free tier) may have cold starts; the first request can be slow.
  */
 
 import assert from "node:assert/strict";

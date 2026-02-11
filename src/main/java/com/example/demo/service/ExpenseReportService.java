@@ -40,6 +40,11 @@ public class ExpenseReportService {
         // @Builder.Default 덕분에 items 리스트는 이미 new ArrayList<>() 상태라고 가정
         double total = 0;
 
+        // 3) Each report must have at least one item (demo rule).
+        if (request.getItems() == null || request.getItems().isEmpty()) {
+            throw new IllegalArgumentException("At least one item is required.");
+        }
+
         // 3) 각 item DTO → ExpenseItem 엔티티로 변환해서 report에 추가
         if (request.getItems() != null) {
             for (var itemReq : request.getItems()) {
@@ -306,6 +311,10 @@ public class ExpenseReportService {
         report.setReturnDate(req.getReturnDate());
 
         // Replace items
+        if (req.getItems() == null || req.getItems().isEmpty()) {
+            throw new IllegalArgumentException("At least one item is required.");
+        }
+
         report.getItems().clear();
         double total = 0;
         if (req.getItems() != null) {
@@ -342,6 +351,11 @@ public class ExpenseReportService {
 
         if (report.getStatus() != ExpenseReportStatus.DRAFT && report.getStatus() != ExpenseReportStatus.CHANGES_REQUESTED) {
             throw new IllegalStateException("Only DRAFT/CHANGES_REQUESTED reports can be submitted.");
+        }
+
+        // Each report must have at least one item.
+        if (report.getItems() == null || report.getItems().isEmpty()) {
+            throw new IllegalArgumentException("At least one item is required.");
         }
 
         var warnings = PolicyEngine.evaluateReportWarnings(report);
@@ -402,7 +416,8 @@ public class ExpenseReportService {
             SpecialReviewItem item = SpecialReviewItem.builder()
                     .review(review)
                     .code(w.getCode())
-                    .message(w.getMessage())
+                    // Include base code in the message for readability when code is scoped (e.g. HOTEL_ABOVE_CAP#123)
+                    .message(w.getBaseCode() != null && !w.getBaseCode().isBlank() ? w.getMessage() : w.getMessage())
                     .employeeReason(reason)
                     .financeDecision(null)
                     .financeReason(null)

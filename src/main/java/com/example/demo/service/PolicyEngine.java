@@ -22,11 +22,32 @@ public class PolicyEngine {
     public static final double AIRFARE_LIMIT_INTL = 1000.0;
     public static final double MEAL_DAILY_LIMIT = 75.0;
 
+    // Additional demo caps for remaining categories
+    public static final double TRANSPORTATION_LIMIT = 150.0;
+    public static final double OFFICE_LIMIT = 200.0;
+
     @lombok.Builder
     @lombok.Getter
     public static class Warning {
+        /**
+         * Warning key used for exception review decisions.
+         *
+         * NOTE: This must be unique per exception checklist row.
+         * We encode per-item scope into the code (e.g. HOTEL_ABOVE_CAP#123).
+         */
         private final String code;
+
+        /**
+         * Base policy code (stable, human readable) e.g. HOTEL_ABOVE_CAP.
+         */
+        private final String baseCode;
+
         private final String message;
+
+        /**
+         * Optional item scope (null for report-level warnings).
+         */
+        private final Long itemId;
     }
 
     public static List<Warning> evaluateReportWarnings(ExpenseReport report) {
@@ -40,7 +61,9 @@ public class PolicyEngine {
         if (dep != null && ret != null && dep.isAfter(ret)) {
             flags.add(Warning.builder()
                     .code("TRIP_DATES_INVALID")
+                    .baseCode("TRIP_DATES_INVALID")
                     .message("Trip dates invalid (departure after return)")
+                    .itemId(null)
                     .build());
         }
 
@@ -52,14 +75,18 @@ public class PolicyEngine {
 
             for (ExpenseItem it : report.getItems()) {
                 if (it == null) continue;
+                Long itemId = it.getId();
 
                 // Date outside trip
                 if (dep != null && ret != null && it.getDate() != null) {
                     if (it.getDate().isBefore(dep) || it.getDate().isAfter(ret)) {
                         flags.add(Warning.builder()
                                 .code("ITEM_DATE_OUTSIDE_TRIP")
+                                .baseCode("ITEM_DATE_OUTSIDE_TRIP")
                                 .message("Item date outside trip range")
+                                .itemId(it.getId())
                                 .build());
+                        // add just once (report-level), but still scoped to an example item when possible
                         break;
                     }
                 }
@@ -67,9 +94,12 @@ public class PolicyEngine {
                 // Entertainment cap
                 if (it.getCategory() != null && it.getCategory().equalsIgnoreCase("Entertainment")) {
                     if (it.getAmount() > ENTERTAINMENT_LIMIT) {
+                        String base = "ENTERTAINMENT_ABOVE_CAP";
                         flags.add(Warning.builder()
-                                .code("ENTERTAINMENT_ABOVE_CAP")
+                                .code(itemId != null ? (base + "#" + itemId) : base)
+                                .baseCode(base)
                                 .message("Entertainment above cap ($" + (int) ENTERTAINMENT_LIMIT + ")")
+                                .itemId(itemId)
                                 .build());
                     }
                 }
@@ -77,9 +107,12 @@ public class PolicyEngine {
                 // Hotel cap
                 if (it.getCategory() != null && (it.getCategory().equalsIgnoreCase("Hotel") || it.getCategory().toLowerCase().contains("lodg"))) {
                     if (it.getAmount() > HOTEL_NIGHTLY_LIMIT) {
+                        String base = "HOTEL_ABOVE_CAP";
                         flags.add(Warning.builder()
-                                .code("HOTEL_ABOVE_CAP")
+                                .code(itemId != null ? (base + "#" + itemId) : base)
+                                .baseCode(base)
                                 .message("Hotel above nightly cap ($" + (int) HOTEL_NIGHTLY_LIMIT + ")")
+                                .itemId(itemId)
                                 .build());
                     }
                 }
@@ -89,9 +122,38 @@ public class PolicyEngine {
                     boolean isUsTrip = isUnitedStatesTrip(report);
                     double limit = isUsTrip ? AIRFARE_LIMIT_US : AIRFARE_LIMIT_INTL;
                     if (it.getAmount() > limit) {
+                        String base = "AIRFARE_ABOVE_CAP";
                         flags.add(Warning.builder()
-                                .code("AIRFARE_ABOVE_CAP")
+                                .code(itemId != null ? (base + "#" + itemId) : base)
+                                .baseCode(base)
                                 .message("Airfare above cap ($" + (int) limit + ")")
+                                .itemId(itemId)
+                                .build());
+                    }
+                }
+
+                // Transportation cap
+                if (it.getCategory() != null && it.getCategory().equalsIgnoreCase("Transportation")) {
+                    if (it.getAmount() > TRANSPORTATION_LIMIT) {
+                        String base = "TRANSPORTATION_ABOVE_CAP";
+                        flags.add(Warning.builder()
+                                .code(itemId != null ? (base + "#" + itemId) : base)
+                                .baseCode(base)
+                                .message("Transportation above cap ($" + (int) TRANSPORTATION_LIMIT + ")")
+                                .itemId(itemId)
+                                .build());
+                    }
+                }
+
+                // Office cap
+                if (it.getCategory() != null && it.getCategory().equalsIgnoreCase("Office")) {
+                    if (it.getAmount() > OFFICE_LIMIT) {
+                        String base = "OFFICE_ABOVE_CAP";
+                        flags.add(Warning.builder()
+                                .code(itemId != null ? (base + "#" + itemId) : base)
+                                .baseCode(base)
+                                .message("Office expenses above cap ($" + (int) OFFICE_LIMIT + ")")
+                                .itemId(itemId)
                                 .build());
                     }
                 }
@@ -107,16 +169,19 @@ public class PolicyEngine {
 
             for (var e : mealByDate.entrySet()) {
                 if (e.getValue() > MEAL_DAILY_LIMIT) {
+                    String base = "MEALS_ABOVE_DAILY_CAP";
                     flags.add(Warning.builder()
-                            .code("MEALS_ABOVE_DAILY_CAP")
+                            .code(base)
+                            .baseCode(base)
                             .message("Meals exceed daily cap ($" + (int) MEAL_DAILY_LIMIT + ")")
+                            .itemId(null)
                             .build());
                     break;
                 }
             }
         }
 
-        return dedupe(flags);
+        return flags;
     }
 
     // Backward compatible helper used by existing DTO code
@@ -136,15 +201,6 @@ public class PolicyEngine {
                 || country.equalsIgnoreCase("United States of America");
     }
 
-    private static List<Warning> dedupe(List<Warning> flags) {
-        if (flags == null || flags.isEmpty()) return List.of();
-        var out = new ArrayList<Warning>();
-        for (Warning w : flags) {
-            if (w == null || w.getCode() == null || w.getCode().isBlank()) continue;
-            boolean exists = out.stream().anyMatch(x -> x.getCode().equals(w.getCode()));
-            if (!exists) out.add(w);
-        }
-        return out;
-    }
 }
+
 

@@ -22,6 +22,27 @@ public class ExpenseReportService {
     private final com.example.demo.repository.SpecialReviewRepository specialReviewRepository;
     private final UserRepository userRepository;
 
+    private void validateNoDuplicateMealDates(List<ExpenseItem> items) {
+        if (items == null || items.isEmpty()) return;
+        var seen = new java.util.HashMap<java.time.LocalDate, Integer>();
+
+        for (ExpenseItem it : items) {
+            if (it == null) continue;
+            if (it.getDate() == null) continue;
+
+            boolean isMeal = false;
+            if (it.getCategory() != null && it.getCategory().toLowerCase().contains("meal")) isMeal = true;
+            if (it.getDescription() != null && it.getDescription().toLowerCase().contains("per diem")) isMeal = true;
+            if (!isMeal) continue;
+
+            int next = seen.getOrDefault(it.getDate(), 0) + 1;
+            seen.put(it.getDate(), next);
+            if (next > 1) {
+                throw new IllegalArgumentException("Only one meal entry per date is allowed in this demo.");
+            }
+        }
+    }
+
     public Long createReport(ExpenseReportCreateRequest request) {
 
         // 1) submitterId로 User 찾아오기
@@ -64,6 +85,9 @@ public class ExpenseReportService {
         }
 
         report.setTotalAmount(total);
+
+        // Enforce meal rule (no duplicate meal entries by date)
+        validateNoDuplicateMealDates(report.getItems());
 
         // 4) 저장 (cascade = ALL 덕분에 item들도 같이 저장됨)
         ExpenseReport saved = expenseReportRepository.save(report);
@@ -333,6 +357,9 @@ public class ExpenseReportService {
         }
         report.setTotalAmount(total);
 
+        // Enforce meal rule (no duplicate meal entries by date)
+        validateNoDuplicateMealDates(report.getItems());
+
         expenseReportRepository.save(report);
         return report.getStatus();
     }
@@ -357,6 +384,9 @@ public class ExpenseReportService {
         if (report.getItems() == null || report.getItems().isEmpty()) {
             throw new IllegalArgumentException("At least one item is required.");
         }
+
+        // Enforce meal rule (no duplicate meal entries by date)
+        validateNoDuplicateMealDates(report.getItems());
 
         var warnings = PolicyEngine.evaluateReportWarnings(report);
         if (warnings.isEmpty()) {

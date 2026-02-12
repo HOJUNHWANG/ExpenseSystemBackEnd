@@ -170,12 +170,27 @@ public class PolicyEngine {
             for (var e : mealByDate.entrySet()) {
                 if (e.getValue() > MEAL_DAILY_LIMIT) {
                     String base = "MEALS_ABOVE_DAILY_CAP";
-                    flags.add(Warning.builder()
-                            .code(base)
-                            .baseCode(base)
-                            .message("Meals exceed daily cap ($" + (int) MEAL_DAILY_LIMIT + ")")
-                            .itemId(null)
-                            .build());
+
+                    // Create per-item warnings for all meal items on the over-cap date so exception review can be decided per item.
+                    LocalDate overDate = e.getKey();
+                    for (ExpenseItem it : report.getItems()) {
+                        if (it == null) continue;
+                        if (it.getDate() == null || !it.getDate().equals(overDate)) continue;
+
+                        boolean isMeal = false;
+                        if (it.getCategory() != null && it.getCategory().toLowerCase().contains("meal")) isMeal = true;
+                        if (it.getDescription() != null && it.getDescription().toLowerCase().contains("per diem")) isMeal = true;
+                        if (!isMeal) continue;
+
+                        Long itemId2 = it.getId();
+                        flags.add(Warning.builder()
+                                .code(itemId2 != null ? (base + "#" + itemId2) : base)
+                                .baseCode(base)
+                                .message("Meals exceed daily cap ($" + (int) MEAL_DAILY_LIMIT + ")")
+                                .itemId(itemId2)
+                                .build());
+                    }
+
                     break;
                 }
             }

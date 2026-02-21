@@ -6,6 +6,7 @@ import com.example.demo.dto.ExpenseReportListItemResponse;
 import com.example.demo.dto.ExpenseReportResponse;
 import com.example.demo.dto.ApprovalRequest;
 import com.example.demo.service.ExpenseReportService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -20,7 +21,7 @@ public class ExpenseReportController {
     private final ExpenseReportService expenseReportService;
 
     @PostMapping
-    public ResponseEntity<Long> create(@RequestBody ExpenseReportCreateRequest request) {
+    public ResponseEntity<Long> create(@Valid @RequestBody ExpenseReportCreateRequest request) {
         Long id = expenseReportService.createReport(request);
         return ResponseEntity.ok(id);
     }
@@ -41,10 +42,6 @@ public class ExpenseReportController {
         }
     }
 
-    // 🔹 승인 대기중 목록 (role-based)
-    // MANAGER -> MANAGER_REVIEW
-    // CFO     -> CFO_REVIEW
-    // CEO     -> CEO_REVIEW
     @GetMapping("/pending-approval")
     public ResponseEntity<List<ExpenseReportListItemResponse>> listPendingApproval(
             @RequestParam String requesterRole
@@ -54,7 +51,7 @@ public class ExpenseReportController {
 
     // Submit (routes to approval chain or CFO_SPECIAL_REVIEW)
     @PostMapping("/{id}/submit")
-    public ResponseEntity<String> submit(@PathVariable Long id, @RequestBody com.example.demo.dto.SubmitRequest req) {
+    public ResponseEntity<String> submit(@PathVariable Long id, @Valid @RequestBody com.example.demo.dto.SubmitRequest req) {
         var st = expenseReportService.submitReport(id, req);
         return ResponseEntity.ok(st.name());
     }
@@ -78,7 +75,7 @@ public class ExpenseReportController {
     @PostMapping("/{id}/special-review/decide")
     public ResponseEntity<String> decideExceptionReview(
             @PathVariable Long id,
-            @RequestBody com.example.demo.dto.SpecialReviewDecisionRequest req
+            @Valid @RequestBody com.example.demo.dto.SpecialReviewDecisionRequest req
     ) {
         var st = expenseReportService.decideExceptionReview(id, req);
         return ResponseEntity.ok(st.name());
@@ -112,7 +109,6 @@ public class ExpenseReportController {
         return ResponseEntity.ok(expenseReportService.getRecentActivity(requesterId, requesterRole, limit));
     }
 
-    // ✅ 2) 상세 조회: /api/expense-reports/{id}
     @GetMapping("/{id}")
     public ResponseEntity<ExpenseReportResponse> getOne(@PathVariable Long id) {
         var result = expenseReportService.getReport(id);
@@ -125,7 +121,7 @@ public class ExpenseReportController {
     @PutMapping("/{id}")
     public ResponseEntity<String> update(
             @PathVariable Long id,
-            @RequestBody com.example.demo.dto.ExpenseReportUpdateRequest req
+            @Valid @RequestBody com.example.demo.dto.ExpenseReportUpdateRequest req
     ) {
         var st = expenseReportService.updateReport(id, req);
         return ResponseEntity.ok(st.name());
@@ -141,28 +137,23 @@ public class ExpenseReportController {
         return ResponseEntity.ok().build();
     }
 
-    // ✅ 승인 API
-    // POST /api/expense-reports/{id}/approve
     @PostMapping("/{id}/approve")
     public ResponseEntity<?> approve(
             @PathVariable Long id,
-            @RequestBody ApprovalRequest request
+            @Valid @RequestBody ApprovalRequest request
     ) {
         try {
             expenseReportService.approveReport(id, request);
             return ResponseEntity.ok().build();
         } catch (IllegalArgumentException | IllegalStateException e) {
-            // 400 Bad Request + 에러 메시지 문자열
             return ResponseEntity.badRequest().body(e.getMessage());
         }
     }
 
-    // ✅ 반려 API
-    // POST /api/expense-reports/{id}/reject
     @PostMapping("/{id}/reject")
     public ResponseEntity<?> reject(
             @PathVariable Long id,
-            @RequestBody ApprovalRequest request
+            @Valid @RequestBody ApprovalRequest request
     ) {
         try {
             expenseReportService.rejectReport(id, request);

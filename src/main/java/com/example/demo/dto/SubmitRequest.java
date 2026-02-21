@@ -1,5 +1,6 @@
 package com.example.demo.dto;
 
+import jakarta.validation.constraints.NotNull;
 import lombok.*;
 
 import java.util.List;
@@ -10,6 +11,7 @@ import java.util.List;
 @AllArgsConstructor
 @Builder
 public class SubmitRequest {
+    @NotNull
     private Long submitterId;
     private List<WarningReason> reasons;
 

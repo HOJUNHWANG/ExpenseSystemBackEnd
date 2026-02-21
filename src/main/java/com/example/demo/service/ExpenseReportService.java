@@ -22,6 +22,17 @@ public class ExpenseReportService {
     private final com.example.demo.repository.SpecialReviewRepository specialReviewRepository;
     private final UserRepository userRepository;
 
+    private UserRole parseRole(String role) {
+        if (role == null || role.isBlank()) {
+            throw new IllegalArgumentException("Role is required");
+        }
+        try {
+            return UserRole.valueOf(role.trim().toUpperCase());
+        } catch (IllegalArgumentException e) {
+            throw new IllegalArgumentException("Unknown role: " + role);
+        }
+    }
+
     private void validateNoDuplicateMealDates(List<ExpenseItem> items) {
         if (items == null || items.isEmpty()) return;
         var seen = new java.util.HashMap<java.time.LocalDate, Integer>();
@@ -161,8 +172,6 @@ public class ExpenseReportService {
                 .build();
     }
 
-    // ExpenseReportService.java 파일에 추가할 내용
-
     // ✅ 3) 특정 사용자의 특정 상태 보고서 목록
     public List<ExpenseReportListItemResponse> findBySubmitterAndStatus(Long submitterId, ExpenseReportStatus status) {
         List<ExpenseReport> reports =
@@ -186,20 +195,14 @@ public class ExpenseReportService {
     }
 
     public List<ExpenseReportListItemResponse> getReportsPendingApproval(String requesterRole) {
-        if (requesterRole == null || requesterRole.isBlank()) {
-            throw new IllegalArgumentException("requesterRole is required");
-        }
+        UserRole role = parseRole(requesterRole);
 
-        ExpenseReportStatus target;
-        if (requesterRole.equalsIgnoreCase("MANAGER")) {
-            target = ExpenseReportStatus.MANAGER_REVIEW;
-        } else if (requesterRole.equalsIgnoreCase("CFO")) {
-            target = ExpenseReportStatus.CFO_REVIEW;
-        } else if (requesterRole.equalsIgnoreCase("CEO")) {
-            target = ExpenseReportStatus.CEO_REVIEW;
-        } else {
-            throw new IllegalArgumentException("Unknown requesterRole: " + requesterRole);
-        }
+        ExpenseReportStatus target = switch (role) {
+            case MANAGER -> ExpenseReportStatus.MANAGER_REVIEW;
+            case CFO -> ExpenseReportStatus.CFO_REVIEW;
+            case CEO -> ExpenseReportStatus.CEO_REVIEW;
+            default -> throw new IllegalArgumentException("Unknown requesterRole: " + requesterRole);
+        };
 
         List<ExpenseReport> reports = expenseReportRepository.findByStatus(target);
 
@@ -226,9 +229,8 @@ public class ExpenseReportService {
      * If requesterRole is not MANAGER/CFO/CEO, results are restricted to requesterId (submitter).
      */
     public List<ExpenseReportListItemResponse> searchReports(Long requesterId, String requesterRole, String q, String status, Double minTotal, Double maxTotal, String sort) {
-        boolean approver = requesterRole != null && (
-                requesterRole.equalsIgnoreCase("MANAGER") || requesterRole.equalsIgnoreCase("CFO") || requesterRole.equalsIgnoreCase("CEO")
-        );
+        UserRole role = parseRole(requesterRole);
+        boolean approver = role == UserRole.MANAGER || role == UserRole.CFO || role == UserRole.CEO;
 
         Long submitterId = approver ? null : requesterId;
 
@@ -274,9 +276,8 @@ public class ExpenseReportService {
     }
 
     public List<com.example.demo.dto.ExpenseReportActivityItem> getRecentActivity(Long requesterId, String requesterRole, int limit) {
-        boolean approver = requesterRole != null && (
-                requesterRole.equalsIgnoreCase("MANAGER") || requesterRole.equalsIgnoreCase("CFO") || requesterRole.equalsIgnoreCase("CEO")
-        );
+        UserRole role = parseRole(requesterRole);
+        boolean approver = role == UserRole.MANAGER || role == UserRole.CFO || role == UserRole.CEO;
         Long submitterId = approver ? null : requesterId;
 
         return expenseReportRepository.recentActivity(submitterId)
@@ -394,21 +395,14 @@ public class ExpenseReportService {
             specialReviewRepository.findByReportId(reportId).ifPresent(specialReviewRepository::delete);
 
             // Route into normal approval chain based on submitter role.
-            String role = report.getSubmitter() != null ? report.getSubmitter().getRole() : null;
-            if (role == null || role.isBlank()) {
-                throw new IllegalStateException("Submitter role missing");
-            }
+            String rawRole = report.getSubmitter() != null ? report.getSubmitter().getRole() : null;
+            UserRole submitterRole = parseRole(rawRole);
 
-            if (role.equalsIgnoreCase("EMPLOYEE")) {
-                report.setStatus(ExpenseReportStatus.MANAGER_REVIEW);
-            } else if (role.equalsIgnoreCase("MANAGER")) {
-                report.setStatus(ExpenseReportStatus.CFO_REVIEW);
-            } else if (role.equalsIgnoreCase("CFO")) {
-                report.setStatus(ExpenseReportStatus.CEO_REVIEW);
-            } else if (role.equalsIgnoreCase("CEO")) {
-                report.setStatus(ExpenseReportStatus.CFO_REVIEW);
-            } else {
-                throw new IllegalStateException("Unknown submitter role: " + role);
+            switch (submitterRole) {
+                case EMPLOYEE -> report.setStatus(ExpenseReportStatus.MANAGER_REVIEW);
+                case MANAGER -> report.setStatus(ExpenseReportStatus.CFO_REVIEW);
+                case CFO -> report.setStatus(ExpenseReportStatus.CEO_REVIEW);
+                case CEO -> report.setStatus(ExpenseReportStatus.CFO_REVIEW);
             }
 
             expenseReportRepository.save(report);
@@ -446,8 +440,7 @@ public class ExpenseReportService {
             SpecialReviewItem item = SpecialReviewItem.builder()
                     .review(review)
                     .code(w.getCode())
-                    // Include base code in the message for readability when code is scoped (e.g. HOTEL_ABOVE_CAP#123)
-                    .message(w.getBaseCode() != null && !w.getBaseCode().isBlank() ? w.getMessage() : w.getMessage())
+                    .message(w.getMessage())
                     .employeeReason(reason)
                     .financeDecision(null)
                     .financeReason(null)
@@ -460,8 +453,9 @@ public class ExpenseReportService {
         // Exception review reviewer depends on who submitted:
         // - If CFO submits and still has exceptions, CEO reviews the exception
         // - Otherwise CFO reviews the exception
-        String role = report.getSubmitter() != null ? report.getSubmitter().getRole() : null;
-        if (role != null && role.equalsIgnoreCase("CFO")) {
+        String rawRole = report.getSubmitter() != null ? report.getSubmitter().getRole() : null;
+        UserRole submitterRole = parseRole(rawRole);
+        if (submitterRole == UserRole.CFO) {
             report.setStatus(ExpenseReportStatus.CEO_SPECIAL_REVIEW);
         } else {
             report.setStatus(ExpenseReportStatus.CFO_SPECIAL_REVIEW);
@@ -538,11 +532,11 @@ public class ExpenseReportService {
             throw new IllegalArgumentException("reviewerId is required");
         }
 
-        String reviewerRole = req.getReviewerRole() != null ? req.getReviewerRole().trim() : "";
-        if (cfoPath && !reviewerRole.equalsIgnoreCase("CFO")) {
+        UserRole reviewerRole = parseRole(req.getReviewerRole());
+        if (cfoPath && reviewerRole != UserRole.CFO) {
             throw new IllegalStateException("Only CFO can approve CFO special reviews.");
         }
-        if (ceoPath && !reviewerRole.equalsIgnoreCase("CEO")) {
+        if (ceoPath && reviewerRole != UserRole.CEO) {
             throw new IllegalStateException("Only CEO can approve CEO special reviews.");
         }
 
@@ -597,21 +591,14 @@ public class ExpenseReportService {
         // Approved exception review: clear review records and route to normal approval chain.
         specialReviewRepository.delete(review);
 
-        String role = report.getSubmitter() != null ? report.getSubmitter().getRole() : null;
-        if (role == null || role.isBlank()) {
-            throw new IllegalStateException("Submitter role missing");
-        }
+        String rawRole = report.getSubmitter() != null ? report.getSubmitter().getRole() : null;
+        UserRole submitterRole = parseRole(rawRole);
 
-        if (role.equalsIgnoreCase("EMPLOYEE")) {
-            report.setStatus(ExpenseReportStatus.MANAGER_REVIEW);
-        } else if (role.equalsIgnoreCase("MANAGER")) {
-            report.setStatus(ExpenseReportStatus.CFO_REVIEW);
-        } else if (role.equalsIgnoreCase("CFO")) {
-            report.setStatus(ExpenseReportStatus.CEO_REVIEW);
-        } else if (role.equalsIgnoreCase("CEO")) {
-            report.setStatus(ExpenseReportStatus.CFO_REVIEW);
-        } else {
-            throw new IllegalStateException("Unknown submitter role: " + role);
+        switch (submitterRole) {
+            case EMPLOYEE -> report.setStatus(ExpenseReportStatus.MANAGER_REVIEW);
+            case MANAGER -> report.setStatus(ExpenseReportStatus.CFO_REVIEW);
+            case CFO -> report.setStatus(ExpenseReportStatus.CEO_REVIEW);
+            case CEO -> report.setStatus(ExpenseReportStatus.CFO_REVIEW);
         }
 
         expenseReportRepository.save(report);
@@ -633,11 +620,10 @@ public class ExpenseReportService {
         // Role-based status transition
         ExpenseReportStatus st = report.getStatus();
 
-        String approverRole = approver.getRole();
-        if (approverRole == null) approverRole = "";
+        UserRole approverRole = parseRole(approver.getRole());
 
         if (st == ExpenseReportStatus.MANAGER_REVIEW || st == ExpenseReportStatus.SUBMITTED /* legacy */) {
-            if (!approverRole.equalsIgnoreCase("MANAGER")) {
+            if (approverRole != UserRole.MANAGER) {
                 throw new IllegalStateException("Only MANAGER can approve MANAGER_REVIEW reports.");
             }
             report.setStatus(ExpenseReportStatus.CFO_REVIEW);
@@ -646,10 +632,9 @@ public class ExpenseReportService {
         }
 
         if (st == ExpenseReportStatus.CFO_REVIEW) {
-            if (!approverRole.equalsIgnoreCase("CFO")) {
+            if (approverRole != UserRole.CFO) {
                 throw new IllegalStateException("Only CFO can approve CFO_REVIEW reports.");
             }
-            // Final approval unless submitter is CFO or special route is defined.
             report.setStatus(ExpenseReportStatus.APPROVED);
             report.setApprover(approver);
             report.setApprovedAt(LocalDateTime.now());
@@ -659,7 +644,7 @@ public class ExpenseReportService {
         }
 
         if (st == ExpenseReportStatus.CEO_REVIEW) {
-            if (!approverRole.equalsIgnoreCase("CEO")) {
+            if (approverRole != UserRole.CEO) {
                 throw new IllegalStateException("Only CEO can approve CEO_REVIEW reports.");
             }
             report.setStatus(ExpenseReportStatus.APPROVED);

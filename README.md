@@ -40,6 +40,25 @@ Rules:
   - exception review data is cleared
   - report routes back into the normal approval chain
 
+## Code quality
+
+### Input validation (Jakarta Validation)
+All `@RequestBody` DTOs are annotated with Jakarta Validation constraints (`@NotNull`, `@NotBlank`, `@NotEmpty`, `@PositiveOrZero`) and validated via `@Valid` in controllers. Invalid requests return a `400 Bad Request` with a field-level error map:
+
+```json
+{ "title": "must not be blank", "items": "must not be empty" }
+```
+
+### UserRole enum
+Business logic uses a `UserRole` enum (`EMPLOYEE`, `MANAGER`, `CFO`, `CEO`) instead of raw strings, preventing typos and enabling compile-time safety. The `User` entity keeps a `String role` field for DB compatibility; conversion happens at the service layer.
+
+### Error handling
+`GlobalExceptionHandler` provides consistent JSON error responses for:
+- `IllegalArgumentException` → 400
+- `EntityNotFoundException` → 404
+- `MethodArgumentNotValidException` → 400 (field-level errors)
+- Catch-all `Exception` → 500
+
 ## Local development
 
 ### Requirements

@@ -15,6 +15,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import com.example.demo.dto.AuditLogResponse;
 import java.util.List;
 
 @Tag(name = "Expense Reports", description = "CRUD and workflow operations for expense reports")
@@ -137,6 +138,12 @@ public class ExpenseReportController {
         return ResponseEntity.ok(expenseReportService.getRecentActivity(requesterId, requesterRole, limit));
     }
 
+    @Operation(summary = "Get audit log", description = "Returns the full change history timeline for a report")
+    @GetMapping("/{id}/audit-log")
+    public ResponseEntity<List<AuditLogResponse>> getAuditLog(@PathVariable Long id) {
+        return ResponseEntity.ok(expenseReportService.getAuditLog(id));
+    }
+
     @Operation(summary = "Get report by ID", description = "Returns full expense report details including line items and approval history")
     @GetMapping("/{id}")
     public ResponseEntity<ExpenseReportResponse> getOne(@PathVariable Long id) {
@@ -154,7 +161,7 @@ public class ExpenseReportController {
         return ResponseEntity.ok(st.name());
     }
 
-    @Operation(summary = "Delete a draft report", description = "Permanently deletes a report in DRAFT status")
+    @Operation(summary = "Delete a report", description = "Permanently deletes a report in DRAFT or CHANGES_REQUESTED status")
     @DeleteMapping("/{id}")
     public ResponseEntity<?> delete(
             @PathVariable Long id,

@@ -32,6 +32,11 @@ public class ExpenseReportResponse {
 
     private String approvalComment;
 
+    // Per-diem
+    private double perDiemAmount;
+    private double perDiemRate;
+    private int perDiemDays;
+
     // Demo policy flags
     private boolean flagged;
     private List<String> policyFlags;

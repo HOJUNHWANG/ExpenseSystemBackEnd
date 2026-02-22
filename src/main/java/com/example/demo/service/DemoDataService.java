@@ -1,6 +1,7 @@
 package com.example.demo.service;
 
 import com.example.demo.domain.*;
+import com.example.demo.repository.AuditLogRepository;
 import com.example.demo.repository.ExpenseReportRepository;
 import com.example.demo.repository.UserRepository;
 import jakarta.transaction.Transactional;
@@ -9,6 +10,7 @@ import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 
 @Service
@@ -19,12 +21,14 @@ public class DemoDataService {
     private final com.example.demo.repository.ExpenseItemRepository expenseItemRepository;
     private final com.example.demo.repository.SpecialReviewItemRepository specialReviewItemRepository;
     private final com.example.demo.repository.SpecialReviewRepository specialReviewRepository;
+    private final AuditLogRepository auditLogRepository;
     private final UserRepository userRepository;
 
     @Transactional
     public void resetAndSeed() {
         // IMPORTANT (Postgres): bulk deletes do NOT trigger JPA cascades.
         // Delete child tables first to avoid FK constraint violations.
+        auditLogRepository.deleteAllInBatch();
         expenseItemRepository.deleteAllInBatch();
         specialReviewItemRepository.deleteAllInBatch();
         specialReviewRepository.deleteAllInBatch();
@@ -57,9 +61,10 @@ public class DemoDataService {
                 .build());
 
         // seeded reports (cover every major workflow state)
+        LocalDateTime baseTime = LocalDateTime.now().minusDays(1);
 
         // 1) DRAFT (no warnings): submit → approval chain
-        seedReport(employee, null,
+        ExpenseReport r1 = seedReport(employee, null,
                 "Draft — Local Lunch",
                 "New York",
                 LocalDate.now().minusDays(2),
@@ -69,9 +74,10 @@ public class DemoDataService {
                 List.of(
                         ExpenseItem.builder().date(LocalDate.now().minusDays(2)).description("Lunch").amount(18.50).category("Meals").build()
                 ));
+        seedAuditLog(r1, "CREATED", null, "DRAFT", employee, null, baseTime.minusHours(12));
 
         // Extra DRAFT: travel
-        seedReport(employee, null,
+        ExpenseReport r2 = seedReport(employee, null,
                 "Draft — Office Supplies",
                 "New York",
                 LocalDate.now().minusDays(1),
@@ -82,9 +88,9 @@ public class DemoDataService {
                         ExpenseItem.builder().date(LocalDate.now().minusDays(1)).description("Monitor cable").amount(19.99).category("Office").build(),
                         ExpenseItem.builder().date(LocalDate.now().minusDays(1)).description("Notebooks").amount(12.40).category("Office").build()
                 ));
+        seedAuditLog(r2, "CREATED", null, "DRAFT", employee, null, baseTime.minusHours(10));
 
         // 2) DRAFT (has warnings): submit requires per-warning reasons → CFO_SPECIAL_REVIEW
-        // Hotel > $300/night triggers warning; also add >=$25 so receipt warning could apply depending on PolicyEngine.
         ExpenseReport needsFinance = seedReport(employee, null,
                 "Draft — Hotel Exception (needs Finance)",
                 "Boston, United States",
@@ -96,6 +102,8 @@ public class DemoDataService {
                         ExpenseItem.builder().date(LocalDate.now().minusDays(6)).description("Hotel").amount(410.00).category("Hotel").build(),
                         ExpenseItem.builder().date(LocalDate.now().minusDays(5)).description("Meal").amount(48.20).category("Meal").build()
                 ));
+        seedAuditLog(needsFinance, "CREATED", null, "DRAFT", employee, null, baseTime.minusDays(5));
+        seedAuditLog(needsFinance, "SUBMITTED_FOR_REVIEW", "DRAFT", "CFO_SPECIAL_REVIEW", employee, null, baseTime.minusDays(4).plusHours(2));
 
         seedSpecialReviewPending(needsFinance, employee,
                 List.of(
@@ -103,7 +111,7 @@ public class DemoDataService {
                         new SeedWarning("AIRFARE_ABOVE_CAP", "Airfare above cap ($1000)", "Last-minute flight price spike.")
                 ));
 
-        // 3) CHANGES_REQUESTED: finance rejected at least one exception item (includes per-item financeReason)
+        // 3) CHANGES_REQUESTED: finance rejected at least one exception item
         ExpenseReport changesRequested = seedReport(employee, null,
                 "Changes requested — Meals cap exception",
                 "Chicago",
@@ -115,6 +123,9 @@ public class DemoDataService {
                         ExpenseItem.builder().date(LocalDate.now().minusDays(12)).description("Lunch").amount(40.00).category("Meals").build(),
                         ExpenseItem.builder().date(LocalDate.now().minusDays(12)).description("Dinner").amount(55.00).category("Meals").build()
                 ));
+        seedAuditLog(changesRequested, "CREATED", null, "DRAFT", employee, null, baseTime.minusDays(10));
+        seedAuditLog(changesRequested, "SUBMITTED_FOR_REVIEW", "DRAFT", "CFO_SPECIAL_REVIEW", employee, null, baseTime.minusDays(9));
+        seedAuditLog(changesRequested, "EXCEPTION_REJECTED", "CFO_SPECIAL_REVIEW", "CHANGES_REQUESTED", cfo, "Please revise meals to align with policy.", baseTime.minusDays(8));
 
         seedSpecialReviewRejected(changesRequested, employee, cfo,
                 "Please revise meals to align with policy.",
@@ -123,7 +134,7 @@ public class DemoDataService {
                 ));
 
         // 4) MANAGER_REVIEW (pending manager approval): keep approval queue populated
-        seedReport(employee, null,
+        ExpenseReport r4a = seedReport(employee, null,
                 "Submitted — NYC Trip",
                 "New York, United States",
                 LocalDate.now().minusDays(4),
@@ -132,13 +143,13 @@ public class DemoDataService {
                 null,
                 List.of(
                         ExpenseItem.builder().date(LocalDate.now().minusDays(4)).description("Airfare").amount(320.45).category("Airfare").build(),
-                        // Keep under $250 nightly cap so this seeded MANAGER_REVIEW report is clean.
                         ExpenseItem.builder().date(LocalDate.now().minusDays(3)).description("Hotel").amount(240.00).category("Hotel").build(),
-                        // Keep under meal daily cap ($75)
                         ExpenseItem.builder().date(LocalDate.now().minusDays(3)).description("Meal").amount(58.90).category("Meal").build()
                 ));
+        seedAuditLog(r4a, "CREATED", null, "DRAFT", employee, null, baseTime.minusDays(3));
+        seedAuditLog(r4a, "SUBMITTED", "DRAFT", "MANAGER_REVIEW", employee, null, baseTime.minusDays(2));
 
-        seedReport(employee, null,
+        ExpenseReport r4b = seedReport(employee, null,
                 "Submitted — Local Travel — NJ",
                 "New Jersey, United States",
                 LocalDate.now().minusDays(3),
@@ -149,9 +160,11 @@ public class DemoDataService {
                         ExpenseItem.builder().date(LocalDate.now().minusDays(3)).description("Mileage").amount(42.00).category("Mileage").build(),
                         ExpenseItem.builder().date(LocalDate.now().minusDays(3)).description("Parking").amount(18.00).category("Transportation").build()
                 ));
+        seedAuditLog(r4b, "CREATED", null, "DRAFT", employee, null, baseTime.minusDays(2));
+        seedAuditLog(r4b, "SUBMITTED", "DRAFT", "MANAGER_REVIEW", employee, null, baseTime.minusDays(1));
 
         // CFO review queue example (created by Manager)
-        seedReport(manager, null,
+        ExpenseReport r4c = seedReport(manager, null,
                 "Manager submitted — Vendor dinner",
                 "New York, United States",
                 LocalDate.now().minusDays(5),
@@ -159,12 +172,13 @@ public class DemoDataService {
                 ExpenseReportStatus.CFO_REVIEW,
                 null,
                 List.of(
-                        // Keep under entertainment cap ($100) so CFO_REVIEW example is clean.
                         ExpenseItem.builder().date(LocalDate.now().minusDays(5)).description("Team dinner with vendor").amount(90.00).category("Entertainment").build()
                 ));
+        seedAuditLog(r4c, "CREATED", null, "DRAFT", manager, null, baseTime.minusDays(4));
+        seedAuditLog(r4c, "SUBMITTED", "DRAFT", "CFO_REVIEW", manager, null, baseTime.minusDays(3));
 
         // CEO review queue example (created by CFO)
-        seedReport(cfo, null,
+        ExpenseReport r4d = seedReport(cfo, null,
                 "CFO submitted — Board meeting travel",
                 "Washington, DC, United States",
                 LocalDate.now().minusDays(8),
@@ -175,9 +189,11 @@ public class DemoDataService {
                         ExpenseItem.builder().date(LocalDate.now().minusDays(8)).description("Airfare").amount(480.00).category("Airfare").build(),
                         ExpenseItem.builder().date(LocalDate.now().minusDays(7)).description("Hotel").amount(245.00).category("Hotel").build()
                 ));
+        seedAuditLog(r4d, "CREATED", null, "DRAFT", cfo, null, baseTime.minusDays(7));
+        seedAuditLog(r4d, "SUBMITTED", "DRAFT", "CEO_REVIEW", cfo, null, baseTime.minusDays(6));
 
         // CFO review queue example (created by CEO)
-        seedReport(ceo, null,
+        ExpenseReport r4e = seedReport(ceo, null,
                 "CEO submitted — Executive offsite",
                 "Boston, United States",
                 LocalDate.now().minusDays(9),
@@ -185,12 +201,13 @@ public class DemoDataService {
                 ExpenseReportStatus.CFO_REVIEW,
                 null,
                 List.of(
-                        // Keep under meal daily cap ($75)
                         ExpenseItem.builder().date(LocalDate.now().minusDays(9)).description("Executive lunch").amount(68.00).category("Meal").build()
                 ));
+        seedAuditLog(r4e, "CREATED", null, "DRAFT", ceo, null, baseTime.minusDays(8));
+        seedAuditLog(r4e, "SUBMITTED", "DRAFT", "CFO_REVIEW", ceo, null, baseTime.minusDays(7));
 
         // 5) APPROVED
-        seedReport(employee, manager,
+        ExpenseReport r5 = seedReport(employee, manager,
                 "Approved — Client Visit",
                 "Seattle",
                 LocalDate.now().minusDays(20),
@@ -201,9 +218,13 @@ public class DemoDataService {
                         ExpenseItem.builder().date(LocalDate.now().minusDays(20)).description("Train").amount(89.00).category("Travel").build(),
                         ExpenseItem.builder().date(LocalDate.now().minusDays(19)).description("Meals").amount(34.75).category("Meals").build()
                 ));
+        seedAuditLog(r5, "CREATED", null, "DRAFT", employee, null, baseTime.minusDays(18));
+        seedAuditLog(r5, "SUBMITTED", "DRAFT", "MANAGER_REVIEW", employee, null, baseTime.minusDays(17));
+        seedAuditLog(r5, "MANAGER_APPROVED", "MANAGER_REVIEW", "CFO_REVIEW", manager, null, baseTime.minusDays(16));
+        seedAuditLog(r5, "CFO_APPROVED", "CFO_REVIEW", "APPROVED", cfo, "Approved. Thanks!", baseTime.minusDays(15));
 
         // 6) REJECTED (manager)
-        seedReport(employee, manager,
+        ExpenseReport r6 = seedReport(employee, manager,
                 "Rejected — Missing details",
                 "New Jersey",
                 LocalDate.now().minusDays(30),
@@ -213,6 +234,72 @@ public class DemoDataService {
                 List.of(
                         ExpenseItem.builder().date(LocalDate.now().minusDays(30)).description("Ride share").amount(23.40).category("Transport").build()
                 ));
+        seedAuditLog(r6, "CREATED", null, "DRAFT", employee, null, baseTime.minusDays(28));
+        seedAuditLog(r6, "SUBMITTED", "DRAFT", "MANAGER_REVIEW", employee, null, baseTime.minusDays(27));
+        seedAuditLog(r6, "REJECTED", "MANAGER_REVIEW", "REJECTED", manager, "Please add item details and resubmit.", baseTime.minusDays(26));
+
+        // 7) International DRAFT — per-diem $50/day x 3 = $150
+        ExpenseReport r7 = seedReport(employee, null,
+                "Draft — London Conference",
+                "London, United Kingdom",
+                LocalDate.now().minusDays(5),
+                LocalDate.now().minusDays(2),
+                ExpenseReportStatus.DRAFT,
+                null,
+                List.of(
+                        ExpenseItem.builder().date(LocalDate.now().minusDays(5)).description("Hotel").amount(280.00).category("Hotel").build(),
+                        ExpenseItem.builder().date(LocalDate.now().minusDays(4)).description("Airfare").amount(650.00).category("Airfare").build(),
+                        ExpenseItem.builder().date(LocalDate.now().minusDays(3)).description("Meal").amount(45.00).category("Meal").build()
+                ));
+        seedAuditLog(r7, "CREATED", null, "DRAFT", employee, null, baseTime.minusHours(8));
+
+        // 8) Same-day domestic trip — per-diem $0
+        ExpenseReport r8 = seedReport(employee, null,
+                "Draft — Same-day DC Trip",
+                "Washington, DC, United States",
+                LocalDate.now().minusDays(1),
+                LocalDate.now().minusDays(1),
+                ExpenseReportStatus.DRAFT,
+                null,
+                List.of(
+                        ExpenseItem.builder().date(LocalDate.now().minusDays(1)).description("Train").amount(65.00).category("Transportation").build(),
+                        ExpenseItem.builder().date(LocalDate.now().minusDays(1)).description("Lunch").amount(22.00).category("Meal").build()
+                ));
+        seedAuditLog(r8, "CREATED", null, "DRAFT", employee, null, baseTime.minusHours(6));
+
+        // 9) Multi-day domestic APPROVED — per-diem $25/day x 6 = $150
+        ExpenseReport r9 = seedReport(employee, manager,
+                "Approved — LA Training",
+                "Los Angeles, United States",
+                LocalDate.now().minusDays(22),
+                LocalDate.now().minusDays(16),
+                ExpenseReportStatus.APPROVED,
+                "Approved for training program.",
+                List.of(
+                        ExpenseItem.builder().date(LocalDate.now().minusDays(22)).description("Airfare").amount(350.00).category("Airfare").build(),
+                        ExpenseItem.builder().date(LocalDate.now().minusDays(21)).description("Hotel (5 nights)").amount(1100.00).category("Hotel").build(),
+                        ExpenseItem.builder().date(LocalDate.now().minusDays(20)).description("Taxi").amount(45.00).category("Transportation").build()
+                ));
+        seedAuditLog(r9, "CREATED", null, "DRAFT", employee, null, baseTime.minusDays(20));
+        seedAuditLog(r9, "SUBMITTED", "DRAFT", "MANAGER_REVIEW", employee, null, baseTime.minusDays(19));
+        seedAuditLog(r9, "MANAGER_APPROVED", "MANAGER_REVIEW", "CFO_REVIEW", manager, null, baseTime.minusDays(18));
+        seedAuditLog(r9, "CFO_APPROVED", "CFO_REVIEW", "APPROVED", cfo, "Approved for training program.", baseTime.minusDays(17));
+
+        // 10) International MANAGER_REVIEW — per-diem $50/day x 3 = $150
+        ExpenseReport r10 = seedReport(employee, null,
+                "Submitted — Tokyo Client Meeting",
+                "Tokyo, Japan",
+                LocalDate.now().minusDays(7),
+                LocalDate.now().minusDays(4),
+                ExpenseReportStatus.MANAGER_REVIEW,
+                null,
+                List.of(
+                        ExpenseItem.builder().date(LocalDate.now().minusDays(7)).description("Airfare").amount(1200.00).category("Airfare").build(),
+                        ExpenseItem.builder().date(LocalDate.now().minusDays(6)).description("Hotel (3 nights)").amount(600.00).category("Hotel").build(),
+                        ExpenseItem.builder().date(LocalDate.now().minusDays(5)).description("Client dinner").amount(85.00).category("Entertainment").build()
+                ));
+        seedAuditLog(r10, "CREATED", null, "DRAFT", employee, null, baseTime.minusDays(6));
+        seedAuditLog(r10, "SUBMITTED", "DRAFT", "MANAGER_REVIEW", employee, null, baseTime.minusDays(5));
     }
 
     private ExpenseReport seedReport(
@@ -242,6 +329,19 @@ public class DemoDataService {
             report.getItems().add(it);
             total += it.getAmount();
         }
+
+        // Compute per-diem
+        if (departure != null && ret != null && departure.isBefore(ret)) {
+            long days = ChronoUnit.DAYS.between(departure, ret);
+            String lower = (destination != null) ? destination.toLowerCase() : "";
+            boolean domestic = lower.contains("united states") || lower.endsWith(", us") || !lower.contains(",");
+            double rate = domestic ? 25.0 : 50.0;
+            report.setPerDiemDays((int) days);
+            report.setPerDiemRate(rate);
+            report.setPerDiemAmount(days * rate);
+            total += report.getPerDiemAmount();
+        }
+
         report.setTotalAmount(total);
 
         if (status == ExpenseReportStatus.APPROVED || status == ExpenseReportStatus.REJECTED) {
@@ -262,6 +362,20 @@ public class DemoDataService {
             SpecialReviewDecision financeDecision,
             String financeReason
     ) {}
+
+    private void seedAuditLog(ExpenseReport report, String action, String fromStatus, String toStatus,
+                              User actor, String comment, LocalDateTime createdAt) {
+        auditLogRepository.save(AuditLog.builder()
+                .report(report)
+                .action(action)
+                .fromStatus(fromStatus)
+                .toStatus(toStatus)
+                .actorId(actor.getId())
+                .actorName(actor.getName())
+                .comment(comment)
+                .createdAt(createdAt)
+                .build());
+    }
 
     private void seedSpecialReviewPending(ExpenseReport report, User employee, List<SeedWarning> warnings) {
         SpecialReview review = SpecialReview.builder()

@@ -1,12 +1,8 @@
 package com.example.demo.service;
 
 import com.example.demo.domain.*;
-import com.example.demo.dto.ExpenseItemResponse;
-import com.example.demo.dto.ExpenseReportCreateRequest;
-import com.example.demo.dto.ExpenseReportListItemResponse;
-import com.example.demo.dto.ExpenseReportResponse;
-import com.example.demo.dto.ApprovalRequest;
-import com.example.demo.dto.PageResponse;
+import com.example.demo.dto.*;
+import com.example.demo.repository.AuditLogRepository;
 import com.example.demo.repository.ExpenseReportRepository;
 import com.example.demo.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -16,6 +12,7 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 
 @Service
@@ -24,7 +21,36 @@ public class ExpenseReportService {
 
     private final ExpenseReportRepository expenseReportRepository;
     private final com.example.demo.repository.SpecialReviewRepository specialReviewRepository;
+    private final AuditLogRepository auditLogRepository;
     private final UserRepository userRepository;
+
+    private void logAudit(ExpenseReport report, String action, String fromStatus, String toStatus, Long actorId, String actorName, String comment) {
+        auditLogRepository.save(AuditLog.builder()
+                .report(report)
+                .action(action)
+                .fromStatus(fromStatus)
+                .toStatus(toStatus)
+                .actorId(actorId)
+                .actorName(actorName)
+                .comment(comment)
+                .createdAt(LocalDateTime.now())
+                .build());
+    }
+
+    public List<AuditLogResponse> getAuditLog(Long reportId) {
+        return auditLogRepository.findByReportIdOrderByCreatedAtAsc(reportId).stream()
+                .map(log -> AuditLogResponse.builder()
+                        .id(log.getId())
+                        .action(log.getAction())
+                        .fromStatus(log.getFromStatus())
+                        .toStatus(log.getToStatus())
+                        .actorId(log.getActorId())
+                        .actorName(log.getActorName())
+                        .comment(log.getComment())
+                        .createdAt(log.getCreatedAt())
+                        .build())
+                .toList();
+    }
 
     private UserRole parseRole(String role) {
         if (role == null || role.isBlank()) {
@@ -56,6 +82,35 @@ public class ExpenseReportService {
                 throw new IllegalArgumentException("Only one meal entry per date is allowed in this demo.");
             }
         }
+    }
+
+    private boolean isDomestic(String destination) {
+        if (destination == null) return true;
+        String lower = destination.toLowerCase();
+        return lower.contains("united states") || lower.endsWith(", us")
+                || !lower.contains(","); // no country separator → assume domestic
+    }
+
+    private void computePerDiem(ExpenseReport report) {
+        if (report.getDepartureDate() == null || report.getReturnDate() == null) {
+            report.setPerDiemDays(0);
+            report.setPerDiemRate(0);
+            report.setPerDiemAmount(0);
+            return;
+        }
+        if (!report.getDepartureDate().isBefore(report.getReturnDate())) {
+            // same-day trip → no per-diem
+            report.setPerDiemDays(0);
+            report.setPerDiemRate(0);
+            report.setPerDiemAmount(0);
+            return;
+        }
+        long days = ChronoUnit.DAYS.between(report.getDepartureDate(), report.getReturnDate());
+        boolean domestic = isDomestic(report.getDestination());
+        double rate = domestic ? 25.0 : 50.0;
+        report.setPerDiemDays((int) days);
+        report.setPerDiemRate(rate);
+        report.setPerDiemAmount(days * rate);
     }
 
     public Long createReport(ExpenseReportCreateRequest request) {
@@ -99,13 +154,17 @@ public class ExpenseReportService {
             }
         }
 
-        report.setTotalAmount(total);
+        // Compute per-diem and add to total
+        computePerDiem(report);
+        report.setTotalAmount(total + report.getPerDiemAmount());
 
         // Enforce meal rule (no duplicate meal entries by date)
         validateNoDuplicateMealDates(report.getItems());
 
         // 4) 저장 (cascade = ALL 덕분에 item들도 같이 저장됨)
         ExpenseReport saved = expenseReportRepository.save(report);
+
+        logAudit(saved, "CREATED", null, "DRAFT", submitter.getId(), submitter.getName(), null);
 
         return saved.getId();
     }
@@ -120,6 +179,9 @@ public class ExpenseReportService {
                 .destination(r.getDestination())
                 .departureDate(r.getDepartureDate())
                 .returnDate(r.getReturnDate())
+                .perDiemAmount(r.getPerDiemAmount())
+                .perDiemRate(r.getPerDiemRate())
+                .perDiemDays(r.getPerDiemDays())
                 .flagged(flagged)
                 .build();
     }
@@ -285,6 +347,9 @@ public class ExpenseReportService {
                 .approverId(r.getApprover() != null ? r.getApprover().getId() : null)
                 .approverName(r.getApprover() != null ? r.getApprover().getName() : null)
                 .approvalComment(r.getApprovalComment())
+                .perDiemAmount(r.getPerDiemAmount())
+                .perDiemRate(r.getPerDiemRate())
+                .perDiemDays(r.getPerDiemDays())
                 .flagged(!flags.isEmpty())
                 .policyFlags(flags)
                 .policyWarnings(warnings.stream().map(w -> com.example.demo.dto.PolicyWarningResponse.builder()
@@ -490,12 +555,19 @@ public class ExpenseReportService {
                 total += itemReq.getAmount();
             }
         }
-        report.setTotalAmount(total);
+        // Compute per-diem and add to total
+        computePerDiem(report);
+        report.setTotalAmount(total + report.getPerDiemAmount());
 
         // Enforce meal rule (no duplicate meal entries by date)
         validateNoDuplicateMealDates(report.getItems());
 
         expenseReportRepository.save(report);
+
+        User submitter = report.getSubmitter();
+        logAudit(report, "UPDATED", report.getStatus().name(), report.getStatus().name(),
+                submitter.getId(), submitter.getName(), null);
+
         return report.getStatus();
     }
 
@@ -523,6 +595,9 @@ public class ExpenseReportService {
         // Enforce meal rule (no duplicate meal entries by date)
         validateNoDuplicateMealDates(report.getItems());
 
+        String previousStatus = report.getStatus().name();
+        User submitter = report.getSubmitter();
+
         var warnings = PolicyEngine.evaluateReportWarnings(report);
         if (warnings.isEmpty()) {
             // Clear any previous exception-review record
@@ -540,6 +615,8 @@ public class ExpenseReportService {
             }
 
             expenseReportRepository.save(report);
+            logAudit(report, "SUBMITTED", previousStatus, report.getStatus().name(),
+                    submitter.getId(), submitter.getName(), null);
             return report.getStatus();
         }
 
@@ -595,6 +672,8 @@ public class ExpenseReportService {
             report.setStatus(ExpenseReportStatus.CFO_SPECIAL_REVIEW);
         }
         expenseReportRepository.save(report);
+        logAudit(report, "SUBMITTED_FOR_REVIEW", previousStatus, report.getStatus().name(),
+                submitter.getId(), submitter.getName(), null);
         return report.getStatus();
     }
 
@@ -656,6 +735,7 @@ public class ExpenseReportService {
         ExpenseReport report = expenseReportRepository.findById(reportId)
                 .orElseThrow(() -> new IllegalArgumentException("Report not found: " + reportId));
 
+        String previousStatus = report.getStatus().name();
         boolean cfoPath = report.getStatus() == ExpenseReportStatus.CFO_SPECIAL_REVIEW;
         boolean ceoPath = report.getStatus() == ExpenseReportStatus.CEO_SPECIAL_REVIEW;
         if (!cfoPath && !ceoPath) {
@@ -719,6 +799,8 @@ public class ExpenseReportService {
             }
             report.setStatus(ExpenseReportStatus.CHANGES_REQUESTED);
             expenseReportRepository.save(report);
+            logAudit(report, "EXCEPTION_REJECTED", previousStatus, report.getStatus().name(),
+                    reviewer.getId(), reviewer.getName(), req.getReviewerComment());
             return report.getStatus();
         }
 
@@ -736,6 +818,8 @@ public class ExpenseReportService {
         }
 
         expenseReportRepository.save(report);
+        logAudit(report, "EXCEPTION_APPROVED", previousStatus, report.getStatus().name(),
+                reviewer.getId(), reviewer.getName(), req.getReviewerComment());
         return report.getStatus();
     }
 
@@ -762,6 +846,8 @@ public class ExpenseReportService {
             }
             report.setStatus(ExpenseReportStatus.CFO_REVIEW);
             expenseReportRepository.save(report);
+            logAudit(report, "MANAGER_APPROVED", st.name(), report.getStatus().name(),
+                    approver.getId(), approver.getName(), req.getComment());
             return;
         }
 
@@ -774,6 +860,8 @@ public class ExpenseReportService {
             report.setApprovedAt(LocalDateTime.now());
             report.setApprovalComment(req.getComment());
             expenseReportRepository.save(report);
+            logAudit(report, "CFO_APPROVED", st.name(), report.getStatus().name(),
+                    approver.getId(), approver.getName(), req.getComment());
             return;
         }
 
@@ -786,6 +874,8 @@ public class ExpenseReportService {
             report.setApprovedAt(LocalDateTime.now());
             report.setApprovalComment(req.getComment());
             expenseReportRepository.save(report);
+            logAudit(report, "CEO_APPROVED", st.name(), report.getStatus().name(),
+                    approver.getId(), approver.getName(), req.getComment());
             return;
         }
 
@@ -804,8 +894,8 @@ public class ExpenseReportService {
             throw new IllegalStateException("Only the submitter can delete this report.");
         }
 
-        if (report.getStatus() != ExpenseReportStatus.DRAFT) {
-            throw new IllegalStateException("Only DRAFT reports can be deleted.");
+        if (report.getStatus() != ExpenseReportStatus.DRAFT && report.getStatus() != ExpenseReportStatus.CHANGES_REQUESTED) {
+            throw new IllegalStateException("Only DRAFT/CHANGES_REQUESTED reports can be deleted.");
         }
 
         // If an exception review exists for some reason, delete it too.
@@ -832,12 +922,15 @@ public class ExpenseReportService {
             throw new IllegalStateException("Only MANAGER_REVIEW/CFO_REVIEW/CEO_REVIEW reports can be rejected.");
         }
 
+        String previousStatus = report.getStatus().name();
         report.setStatus(ExpenseReportStatus.REJECTED);
         report.setApprover(approver);
         report.setApprovedAt(LocalDateTime.now()); // 반려도 처리일자 기록
         report.setApprovalComment(req.getComment());
 
         expenseReportRepository.save(report);
+        logAudit(report, "REJECTED", previousStatus, report.getStatus().name(),
+                approver.getId(), approver.getName(), req.getComment());
     }
 
 }

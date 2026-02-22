@@ -294,6 +294,15 @@ async function main() {
     const id = await createReport({
       submitterId: employee2.id,
       title: "API Smoke — Hotel Exception Loop",
+      items: [
+        { date: "2026-01-10", description: "Hotel night", amount: 400, category: "Hotel" },
+      ],
+    });
+
+    // Set destination and dates via update (CreateRequest doesn't have these fields)
+    await updateReport(id, {
+      submitterId: employee2.id,
+      title: "API Smoke — Hotel Exception Loop",
       destination: "Boston, United States",
       departureDate: "2026-01-10",
       returnDate: "2026-01-10",

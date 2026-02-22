@@ -39,6 +39,11 @@ public class ExpenseReport {
 
     private String approvalComment;
 
+    // Per-diem fields
+    private double perDiemAmount;      // Calculated per-diem total
+    private double perDiemRate;        // Daily rate ($25 domestic, $50 international)
+    private int perDiemDays;           // Number of days
+
     @ManyToOne(fetch = FetchType.LAZY)
     private User submitter;            // Submitter (User)
 

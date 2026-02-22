@@ -6,9 +6,13 @@ import com.example.demo.dto.ExpenseReportCreateRequest;
 import com.example.demo.dto.ExpenseReportListItemResponse;
 import com.example.demo.dto.ExpenseReportResponse;
 import com.example.demo.dto.ApprovalRequest;
+import com.example.demo.dto.PageResponse;
 import com.example.demo.repository.ExpenseReportRepository;
 import com.example.demo.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
@@ -104,6 +108,136 @@ public class ExpenseReportService {
         ExpenseReport saved = expenseReportRepository.save(report);
 
         return saved.getId();
+    }
+
+    private ExpenseReportListItemResponse toListItem(ExpenseReport r) {
+        boolean flagged = !PolicyEngine.evaluateReport(r).isEmpty();
+        return ExpenseReportListItemResponse.builder()
+                .id(r.getId())
+                .title(r.getTitle())
+                .totalAmount(r.getTotalAmount())
+                .status(r.getStatus().name())
+                .destination(r.getDestination())
+                .departureDate(r.getDepartureDate())
+                .returnDate(r.getReturnDate())
+                .flagged(flagged)
+                .build();
+    }
+
+    private <T> PageResponse<T> toPageResponse(Page<?> page, List<T> content) {
+        return PageResponse.<T>builder()
+                .content(content)
+                .page(page.getNumber())
+                .size(page.getSize())
+                .totalElements(page.getTotalElements())
+                .totalPages(page.getTotalPages())
+                .build();
+    }
+
+    // --- Paginated endpoints ---
+
+    public PageResponse<ExpenseReportListItemResponse> getReportsBySubmitterPaged(Long submitterId, int page, int size) {
+        var result = expenseReportRepository.findBySubmitterId(submitterId, PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt")));
+        return toPageResponse(result, result.getContent().stream().map(this::toListItem).toList());
+    }
+
+    public PageResponse<ExpenseReportListItemResponse> findBySubmitterAndStatusPaged(Long submitterId, ExpenseReportStatus status, int page, int size) {
+        var result = expenseReportRepository.findBySubmitterIdAndStatus(submitterId, status, PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt")));
+        return toPageResponse(result, result.getContent().stream().map(this::toListItem).toList());
+    }
+
+    public PageResponse<ExpenseReportListItemResponse> getReportsPendingApprovalPaged(String requesterRole, int page, int size) {
+        UserRole role = parseRole(requesterRole);
+        ExpenseReportStatus target = switch (role) {
+            case MANAGER -> ExpenseReportStatus.MANAGER_REVIEW;
+            case CFO -> ExpenseReportStatus.CFO_REVIEW;
+            case CEO -> ExpenseReportStatus.CEO_REVIEW;
+            default -> throw new IllegalArgumentException("Unknown requesterRole: " + requesterRole);
+        };
+        var result = expenseReportRepository.findByStatus(target, PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt")));
+        return toPageResponse(result, result.getContent().stream().map(this::toListItem).toList());
+    }
+
+    public PageResponse<ExpenseReportListItemResponse> searchReportsPaged(Long requesterId, String requesterRole, String q, String status, Double minTotal, Double maxTotal, String sort, int page, int size) {
+        UserRole role = parseRole(requesterRole);
+        boolean approver = role == UserRole.MANAGER || role == UserRole.CFO || role == UserRole.CEO;
+        Long submitterId = approver ? null : requesterId;
+
+        ExpenseReportStatus st = null;
+        if (status != null && !status.isBlank()) {
+            st = ExpenseReportStatus.valueOf(status.trim().toUpperCase());
+        }
+
+        Sort jpaSort = switch (sort != null ? sort : "activity_desc") {
+            case "total_desc" -> Sort.by(Sort.Direction.DESC, "totalAmount");
+            case "total_asc" -> Sort.by(Sort.Direction.ASC, "totalAmount");
+            default -> Sort.by(Sort.Direction.DESC, "createdAt");
+        };
+
+        var result = expenseReportRepository.searchPaged(submitterId, q, st, minTotal, maxTotal, PageRequest.of(page, size, jpaSort));
+        return toPageResponse(result, result.getContent().stream().map(this::toListItem).toList());
+    }
+
+    // --- Stats ---
+
+    public com.example.demo.dto.StatsResponse getStats() {
+        var all = expenseReportRepository.findAll();
+
+        long approved = all.stream().filter(r -> r.getStatus() == ExpenseReportStatus.APPROVED).count();
+        long rejected = all.stream().filter(r -> r.getStatus() == ExpenseReportStatus.REJECTED).count();
+        long pending = all.stream().filter(r -> {
+            var s = r.getStatus();
+            return s == ExpenseReportStatus.MANAGER_REVIEW || s == ExpenseReportStatus.CFO_REVIEW
+                    || s == ExpenseReportStatus.CEO_REVIEW || s == ExpenseReportStatus.CFO_SPECIAL_REVIEW
+                    || s == ExpenseReportStatus.CEO_SPECIAL_REVIEW;
+        }).count();
+        double totalAmount = all.stream().mapToDouble(ExpenseReport::getTotalAmount).sum();
+
+        // By category (from line items)
+        var categoryMap = new java.util.LinkedHashMap<String, double[]>(); // [amount, count]
+        for (var r : all) {
+            for (var item : r.getItems()) {
+                String cat = item.getCategory() != null ? item.getCategory() : "Other";
+                categoryMap.computeIfAbsent(cat, k -> new double[2]);
+                categoryMap.get(cat)[0] += item.getAmount();
+                categoryMap.get(cat)[1] += 1;
+            }
+        }
+        var byCategory = categoryMap.entrySet().stream()
+                .map(e -> com.example.demo.dto.StatsResponse.CategoryStat.builder()
+                        .category(e.getKey())
+                        .amount(e.getValue()[0])
+                        .count((int) e.getValue()[1])
+                        .build())
+                .sorted((a, b) -> Double.compare(b.getAmount(), a.getAmount()))
+                .toList();
+
+        // By month (based on createdAt)
+        var monthMap = new java.util.TreeMap<String, double[]>();
+        for (var r : all) {
+            if (r.getCreatedAt() == null) continue;
+            String month = r.getCreatedAt().toLocalDate().withDayOfMonth(1).toString().substring(0, 7);
+            monthMap.computeIfAbsent(month, k -> new double[2]);
+            monthMap.get(month)[0] += r.getTotalAmount();
+            monthMap.get(month)[1] += 1;
+        }
+        var byMonth = monthMap.entrySet().stream()
+                .map(e -> com.example.demo.dto.StatsResponse.MonthStat.builder()
+                        .month(e.getKey())
+                        .amount(e.getValue()[0])
+                        .count((int) e.getValue()[1])
+                        .build())
+                .toList();
+
+        return com.example.demo.dto.StatsResponse.builder()
+                .totalReports(all.size())
+                .approved(approved)
+                .rejected(rejected)
+                .pending(pending)
+                .totalAmount(totalAmount)
+                .byCategory(byCategory)
+                .byMonth(byMonth)
+                .build();
     }
 
     // ✅ 1) 특정 사용자의 보고서 목록

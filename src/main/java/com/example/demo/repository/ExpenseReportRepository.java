@@ -62,4 +62,8 @@ public interface ExpenseReportRepository extends JpaRepository<ExpenseReport, Lo
         order by coalesce(r.approvedAt, r.createdAt) desc
     """)
     List<ExpenseReport> recentActivity(@Param("submitterId") Long submitterId);
+
+    /** Fetches all reports with items and submitter in a single query (avoids N+1 in stats). */
+    @Query("select distinct r from ExpenseReport r left join fetch r.items left join fetch r.submitter")
+    List<ExpenseReport> findAllWithItems();
 }

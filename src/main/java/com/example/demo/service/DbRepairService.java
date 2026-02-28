@@ -1,5 +1,7 @@
 package com.example.demo.service;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -21,6 +23,8 @@ import java.util.stream.Collectors;
 @Component
 public class DbRepairService implements ApplicationRunner {
 
+    private static final Logger log = LoggerFactory.getLogger(DbRepairService.class);
+
     private final JdbcTemplate jdbcTemplate;
     private final DataSource dataSource;
 
@@ -37,7 +41,7 @@ public class DbRepairService implements ApplicationRunner {
                 return;
             }
         } catch (Exception e) {
-            // If we can't detect DB, do nothing.
+            log.warn("Could not detect database type, skipping constraint repair: {}", e.getMessage());
             return;
         }
 
@@ -50,6 +54,7 @@ public class DbRepairService implements ApplicationRunner {
                 "CFO_REVIEW",
                 "CEO_REVIEW",
                 "CFO_SPECIAL_REVIEW",
+                "CEO_SPECIAL_REVIEW",
                 "CHANGES_REQUESTED",
                 "APPROVED",
                 "REJECTED"
@@ -66,8 +71,8 @@ public class DbRepairService implements ApplicationRunner {
         try {
             jdbcTemplate.execute("ALTER TABLE expense_reports ADD CONSTRAINT expense_reports_status_check CHECK (status IN (" + allowed + "))");
         } catch (Exception e) {
-            // If this fails, we don't want to crash startup. Log for Render.
-            e.printStackTrace();
+            // If this fails, we don't want to crash startup.
+            log.error("Failed to recreate expense_reports_status_check constraint", e);
         }
     }
 }

@@ -6,10 +6,13 @@ import com.example.demo.repository.AuditLogRepository;
 import com.example.demo.repository.ExpenseReportRepository;
 import com.example.demo.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
@@ -18,6 +21,8 @@ import java.util.List;
 @Service
 @RequiredArgsConstructor
 public class ExpenseReportService {
+
+    private static final Logger log = LoggerFactory.getLogger(ExpenseReportService.class);
 
     private final ExpenseReportRepository expenseReportRepository;
     private final com.example.demo.repository.SpecialReviewRepository specialReviewRepository;
@@ -113,6 +118,7 @@ public class ExpenseReportService {
         report.setPerDiemAmount(days * rate);
     }
 
+    @Transactional
     public Long createReport(ExpenseReportCreateRequest request) {
 
         // 1) submitterId로 User 찾아오기
@@ -243,7 +249,7 @@ public class ExpenseReportService {
     // --- Stats ---
 
     public com.example.demo.dto.StatsResponse getStats() {
-        var all = expenseReportRepository.findAll();
+        var all = expenseReportRepository.findAllWithItems();
 
         long approved = all.stream().filter(r -> r.getStatus() == ExpenseReportStatus.APPROVED).count();
         long rejected = all.stream().filter(r -> r.getStatus() == ExpenseReportStatus.REJECTED).count();
@@ -513,6 +519,7 @@ public class ExpenseReportService {
      *
      * Allowed only for the submitter when the report is in DRAFT or CHANGES_REQUESTED.
      */
+    @Transactional
     public ExpenseReportStatus updateReport(Long reportId, com.example.demo.dto.ExpenseReportUpdateRequest req) {
         ExpenseReport report = expenseReportRepository.findById(reportId)
                 .orElseThrow(() -> new IllegalArgumentException("Report not found: " + reportId));
@@ -571,6 +578,7 @@ public class ExpenseReportService {
         return report.getStatus();
     }
 
+    @Transactional
     public ExpenseReportStatus submitReport(Long reportId, com.example.demo.dto.SubmitRequest req) {
         ExpenseReport report = expenseReportRepository.findById(reportId)
                 .orElseThrow(() -> new IllegalArgumentException("Report not found: " + reportId));
@@ -731,6 +739,7 @@ public class ExpenseReportService {
                 .build();
     }
 
+    @Transactional
     public ExpenseReportStatus decideExceptionReview(Long reportId, com.example.demo.dto.SpecialReviewDecisionRequest req) {
         ExpenseReport report = expenseReportRepository.findById(reportId)
                 .orElseThrow(() -> new IllegalArgumentException("Report not found: " + reportId));
@@ -824,6 +833,7 @@ public class ExpenseReportService {
     }
 
     // Approved
+    @Transactional
     public void approveReport(Long reportId, ApprovalRequest req) {
         ExpenseReport report = expenseReportRepository.findById(reportId)
                 .orElseThrow(() -> new IllegalArgumentException("Report not found: " + reportId));
@@ -882,6 +892,7 @@ public class ExpenseReportService {
         throw new IllegalStateException("Only MANAGER_REVIEW/CFO_REVIEW/CEO_REVIEW reports can be approved.");
     }
 
+    @Transactional
     public void deleteDraft(Long reportId, Long requesterId) {
         ExpenseReport report = expenseReportRepository.findById(reportId)
                 .orElseThrow(() -> new IllegalArgumentException("Report not found: " + reportId));
@@ -904,6 +915,7 @@ public class ExpenseReportService {
     }
 
     // Reject
+    @Transactional
     public void rejectReport(Long reportId, ApprovalRequest req) {
         ExpenseReport report = expenseReportRepository.findById(reportId)
                 .orElseThrow(() -> new IllegalArgumentException("Report not found: " + reportId));

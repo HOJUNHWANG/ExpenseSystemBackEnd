@@ -2,6 +2,8 @@ package com.example.demo;
 
 import com.example.demo.domain.User;
 import com.example.demo.repository.UserRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
@@ -9,6 +11,8 @@ import org.springframework.context.annotation.Bean;
 
 @SpringBootApplication
 public class DemoApplication {
+
+	private static final Logger log = LoggerFactory.getLogger(DemoApplication.class);
 
 	public static void main(String[] args) {
 		SpringApplication.run(DemoApplication.class, args);
@@ -49,7 +53,7 @@ public class DemoApplication {
 				userRepository.save(cfo);
 				userRepository.save(ceo);
 
-				System.out.println("👉 Seed users created.");
+				log.info("Seed users created.");
 			}
 		};
 	}

@@ -5,8 +5,8 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.math.BigDecimal;
 import java.util.List;
-import java.util.Map;
 
 @Data
 @Builder
@@ -17,7 +17,7 @@ public class StatsResponse {
     private long approved;
     private long rejected;
     private long pending;
-    private double totalAmount;
+    private BigDecimal totalAmount;
     private List<CategoryStat> byCategory;
     private List<MonthStat> byMonth;
 
@@ -27,7 +27,7 @@ public class StatsResponse {
     @AllArgsConstructor
     public static class CategoryStat {
         private String category;
-        private double amount;
+        private BigDecimal amount;
         private int count;
     }
 
@@ -37,7 +37,7 @@ public class StatsResponse {
     @AllArgsConstructor
     public static class MonthStat {
         private String month; // "2025-01"
-        private double amount;
+        private BigDecimal amount;
         private int count;
     }
 }

@@ -3,9 +3,12 @@ package com.example.demo.service;
 import com.example.demo.domain.ExpenseItem;
 import com.example.demo.domain.ExpenseReport;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Very small demo policy engine to make the app feel more like a real corporate tool.
@@ -16,15 +19,15 @@ public class PolicyEngine {
 
     // Demo corporate policy knobs
     // NOTE: We intentionally do NOT implement receipt attachment in this demo.
-    public static final double HOTEL_NIGHTLY_LIMIT = 250.0;
-    public static final double ENTERTAINMENT_LIMIT = 100.0;
-    public static final double AIRFARE_LIMIT_US = 500.0;
-    public static final double AIRFARE_LIMIT_INTL = 1000.0;
-    public static final double MEAL_DAILY_LIMIT = 75.0;
+    public static final BigDecimal HOTEL_NIGHTLY_LIMIT = new BigDecimal("250.00");
+    public static final BigDecimal ENTERTAINMENT_LIMIT = new BigDecimal("100.00");
+    public static final BigDecimal AIRFARE_LIMIT_US = new BigDecimal("500.00");
+    public static final BigDecimal AIRFARE_LIMIT_INTL = new BigDecimal("1000.00");
+    public static final BigDecimal MEAL_DAILY_LIMIT = new BigDecimal("75.00");
 
     // Additional demo caps for remaining categories
-    public static final double TRANSPORTATION_LIMIT = 150.0;
-    public static final double OFFICE_LIMIT = 200.0;
+    public static final BigDecimal TRANSPORTATION_LIMIT = new BigDecimal("150.00");
+    public static final BigDecimal OFFICE_LIMIT = new BigDecimal("200.00");
 
     @lombok.Builder
     @lombok.Getter
@@ -70,12 +73,12 @@ public class PolicyEngine {
         // Items
         if (report.getItems() != null) {
             // Meal daily rollup
-            // (sum all items with category containing "meal" on same date)
-            var mealByDate = new java.util.HashMap<LocalDate, Double>();
+            Map<LocalDate, BigDecimal> mealByDate = new HashMap<>();
 
             for (ExpenseItem it : report.getItems()) {
                 if (it == null) continue;
                 Long itemId = it.getId();
+                BigDecimal amount = it.getAmount() != null ? it.getAmount() : BigDecimal.ZERO;
 
                 // Date outside trip
                 if (dep != null && ret != null && it.getDate() != null) {
@@ -86,19 +89,18 @@ public class PolicyEngine {
                                 .message("Item date outside trip range")
                                 .itemId(it.getId())
                                 .build());
-                        // add just once (report-level), but still scoped to an example item when possible
                         break;
                     }
                 }
 
                 // Entertainment cap
                 if (it.getCategory() != null && it.getCategory().equalsIgnoreCase("Entertainment")) {
-                    if (it.getAmount() > ENTERTAINMENT_LIMIT) {
+                    if (amount.compareTo(ENTERTAINMENT_LIMIT) > 0) {
                         String base = "ENTERTAINMENT_ABOVE_CAP";
                         flags.add(Warning.builder()
                                 .code(itemId != null ? (base + "#" + itemId) : base)
                                 .baseCode(base)
-                                .message("Entertainment above cap ($" + (int) ENTERTAINMENT_LIMIT + ")")
+                                .message("Entertainment above cap ($" + ENTERTAINMENT_LIMIT.intValue() + ")")
                                 .itemId(itemId)
                                 .build());
                     }
@@ -106,12 +108,12 @@ public class PolicyEngine {
 
                 // Hotel cap
                 if (it.getCategory() != null && (it.getCategory().equalsIgnoreCase("Hotel") || it.getCategory().toLowerCase().contains("lodg"))) {
-                    if (it.getAmount() > HOTEL_NIGHTLY_LIMIT) {
+                    if (amount.compareTo(HOTEL_NIGHTLY_LIMIT) > 0) {
                         String base = "HOTEL_ABOVE_CAP";
                         flags.add(Warning.builder()
                                 .code(itemId != null ? (base + "#" + itemId) : base)
                                 .baseCode(base)
-                                .message("Hotel above nightly cap ($" + (int) HOTEL_NIGHTLY_LIMIT + ")")
+                                .message("Hotel above nightly cap ($" + HOTEL_NIGHTLY_LIMIT.intValue() + ")")
                                 .itemId(itemId)
                                 .build());
                     }
@@ -120,13 +122,13 @@ public class PolicyEngine {
                 // Airfare cap (depends on destination country)
                 if (it.getCategory() != null && it.getCategory().equalsIgnoreCase("Airfare")) {
                     boolean isUsTrip = isUnitedStatesTrip(report);
-                    double limit = isUsTrip ? AIRFARE_LIMIT_US : AIRFARE_LIMIT_INTL;
-                    if (it.getAmount() > limit) {
+                    BigDecimal limit = isUsTrip ? AIRFARE_LIMIT_US : AIRFARE_LIMIT_INTL;
+                    if (amount.compareTo(limit) > 0) {
                         String base = "AIRFARE_ABOVE_CAP";
                         flags.add(Warning.builder()
                                 .code(itemId != null ? (base + "#" + itemId) : base)
                                 .baseCode(base)
-                                .message("Airfare above cap ($" + (int) limit + ")")
+                                .message("Airfare above cap ($" + limit.intValue() + ")")
                                 .itemId(itemId)
                                 .build());
                     }
@@ -134,12 +136,12 @@ public class PolicyEngine {
 
                 // Transportation cap
                 if (it.getCategory() != null && it.getCategory().equalsIgnoreCase("Transportation")) {
-                    if (it.getAmount() > TRANSPORTATION_LIMIT) {
+                    if (amount.compareTo(TRANSPORTATION_LIMIT) > 0) {
                         String base = "TRANSPORTATION_ABOVE_CAP";
                         flags.add(Warning.builder()
                                 .code(itemId != null ? (base + "#" + itemId) : base)
                                 .baseCode(base)
-                                .message("Transportation above cap ($" + (int) TRANSPORTATION_LIMIT + ")")
+                                .message("Transportation above cap ($" + TRANSPORTATION_LIMIT.intValue() + ")")
                                 .itemId(itemId)
                                 .build());
                     }
@@ -147,12 +149,12 @@ public class PolicyEngine {
 
                 // Office cap
                 if (it.getCategory() != null && it.getCategory().equalsIgnoreCase("Office")) {
-                    if (it.getAmount() > OFFICE_LIMIT) {
+                    if (amount.compareTo(OFFICE_LIMIT) > 0) {
                         String base = "OFFICE_ABOVE_CAP";
                         flags.add(Warning.builder()
                                 .code(itemId != null ? (base + "#" + itemId) : base)
                                 .baseCode(base)
-                                .message("Office expenses above cap ($" + (int) OFFICE_LIMIT + ")")
+                                .message("Office expenses above cap ($" + OFFICE_LIMIT.intValue() + ")")
                                 .itemId(itemId)
                                 .build());
                     }
@@ -163,20 +165,19 @@ public class PolicyEngine {
                 if (it.getCategory() != null && it.getCategory().toLowerCase().contains("meal")) isMeal = true;
                 if (it.getDescription() != null && it.getDescription().toLowerCase().contains("per diem")) isMeal = true;
                 if (isMeal && it.getDate() != null) {
-                    mealByDate.put(it.getDate(), mealByDate.getOrDefault(it.getDate(), 0.0) + it.getAmount());
+                    mealByDate.merge(it.getDate(), amount, BigDecimal::add);
                 }
             }
 
-            for (var e : mealByDate.entrySet()) {
-                if (e.getValue() > MEAL_DAILY_LIMIT) {
+            for (Map.Entry<LocalDate, BigDecimal> e : mealByDate.entrySet()) {
+                if (e.getValue().compareTo(MEAL_DAILY_LIMIT) > 0) {
                     String base = "MEALS_ABOVE_DAILY_CAP";
                     LocalDate overDate = e.getKey();
 
-                    // Scoped by date so multiple days can each produce a checklist row.
                     flags.add(Warning.builder()
                             .code(base + "#" + overDate)
                             .baseCode(base)
-                            .message("Meals exceed daily cap ($" + (int) MEAL_DAILY_LIMIT + ")")
+                            .message("Meals exceed daily cap ($" + MEAL_DAILY_LIMIT.intValue() + ")")
                             .itemId(null)
                             .build());
                 }
@@ -204,5 +205,3 @@ public class PolicyEngine {
     }
 
 }
-
-

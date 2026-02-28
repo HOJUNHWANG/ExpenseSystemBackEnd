@@ -4,6 +4,7 @@ package com.example.demo.dto;
 import lombok.Builder;
 import lombok.Data;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -14,7 +15,7 @@ public class ExpenseReportResponse {
 
     private Long id;
     private String title;
-    private double totalAmount;
+    private BigDecimal totalAmount;
     private String status;
 
     private String destination;
@@ -22,7 +23,8 @@ public class ExpenseReportResponse {
     private LocalDate returnDate;
 
     private LocalDateTime createdAt;
-    private LocalDateTime approvedAt;
+    private LocalDateTime approvedAt;   // Set only on APPROVAL
+    private LocalDateTime rejectedAt;   // Set only on REJECTION
 
     private Long submitterId;
     private String submitterName;
@@ -33,8 +35,8 @@ public class ExpenseReportResponse {
     private String approvalComment;
 
     // Per-diem
-    private double perDiemAmount;
-    private double perDiemRate;
+    private BigDecimal perDiemAmount;
+    private BigDecimal perDiemRate;
     private int perDiemDays;
 
     // Demo policy flags

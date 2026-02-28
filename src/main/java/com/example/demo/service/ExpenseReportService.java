@@ -14,6 +14,7 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
@@ -99,23 +100,23 @@ public class ExpenseReportService {
     private void computePerDiem(ExpenseReport report) {
         if (report.getDepartureDate() == null || report.getReturnDate() == null) {
             report.setPerDiemDays(0);
-            report.setPerDiemRate(0);
-            report.setPerDiemAmount(0);
+            report.setPerDiemRate(BigDecimal.ZERO);
+            report.setPerDiemAmount(BigDecimal.ZERO);
             return;
         }
         if (!report.getDepartureDate().isBefore(report.getReturnDate())) {
             // same-day trip → no per-diem
             report.setPerDiemDays(0);
-            report.setPerDiemRate(0);
-            report.setPerDiemAmount(0);
+            report.setPerDiemRate(BigDecimal.ZERO);
+            report.setPerDiemAmount(BigDecimal.ZERO);
             return;
         }
         long days = ChronoUnit.DAYS.between(report.getDepartureDate(), report.getReturnDate());
         boolean domestic = isDomestic(report.getDestination());
-        double rate = domestic ? 25.0 : 50.0;
+        BigDecimal rate = domestic ? new BigDecimal("25.00") : new BigDecimal("50.00");
         report.setPerDiemDays((int) days);
         report.setPerDiemRate(rate);
-        report.setPerDiemAmount(days * rate);
+        report.setPerDiemAmount(BigDecimal.valueOf(days).multiply(rate));
     }
 
     @Transactional
@@ -134,8 +135,7 @@ public class ExpenseReportService {
 
         report.setStatus(ExpenseReportStatus.DRAFT);
 
-        // @Builder.Default 덕분에 items 리스트는 이미 new ArrayList<>() 상태라고 가정
-        double total = 0;
+        BigDecimal total = BigDecimal.ZERO;
 
         // 3) Each report must have at least one item (demo rule).
         if (request.getItems() == null || request.getItems().isEmpty()) {
@@ -156,13 +156,13 @@ public class ExpenseReportService {
                 item.setExpenseReport(report);
                 report.getItems().add(item);
 
-                total += itemReq.getAmount();
+                total = total.add(itemReq.getAmount() != null ? itemReq.getAmount() : BigDecimal.ZERO);
             }
         }
 
         // Compute per-diem and add to total
         computePerDiem(report);
-        report.setTotalAmount(total + report.getPerDiemAmount());
+        report.setTotalAmount(total.add(report.getPerDiemAmount() != null ? report.getPerDiemAmount() : BigDecimal.ZERO));
 
         // Enforce meal rule (no duplicate meal entries by date)
         validateNoDuplicateMealDates(report.getItems());
@@ -242,7 +242,9 @@ public class ExpenseReportService {
             default -> Sort.by(Sort.Direction.DESC, "createdAt");
         };
 
-        var result = expenseReportRepository.searchPaged(submitterId, q, st, minTotal, maxTotal, PageRequest.of(page, size, jpaSort));
+        BigDecimal minBD = minTotal != null ? BigDecimal.valueOf(minTotal) : null;
+        BigDecimal maxBD = maxTotal != null ? BigDecimal.valueOf(maxTotal) : null;
+        var result = expenseReportRepository.searchPaged(submitterId, q, st, minBD, maxBD, PageRequest.of(page, size, jpaSort));
         return toPageResponse(result, result.getContent().stream().map(this::toListItem).toList());
     }
 
@@ -259,40 +261,46 @@ public class ExpenseReportService {
                     || s == ExpenseReportStatus.CEO_REVIEW || s == ExpenseReportStatus.CFO_SPECIAL_REVIEW
                     || s == ExpenseReportStatus.CEO_SPECIAL_REVIEW;
         }).count();
-        double totalAmount = all.stream().mapToDouble(ExpenseReport::getTotalAmount).sum();
+        BigDecimal totalAmount = all.stream()
+                .map(r -> r.getTotalAmount() != null ? r.getTotalAmount() : BigDecimal.ZERO)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
 
         // By category (from line items)
-        var categoryMap = new java.util.LinkedHashMap<String, double[]>(); // [amount, count]
+        var categoryMap = new java.util.LinkedHashMap<String, Object[]>(); // [BigDecimal amount, int count]
         for (var r : all) {
             for (var item : r.getItems()) {
                 String cat = item.getCategory() != null ? item.getCategory() : "Other";
-                categoryMap.computeIfAbsent(cat, k -> new double[2]);
-                categoryMap.get(cat)[0] += item.getAmount();
-                categoryMap.get(cat)[1] += 1;
+                categoryMap.computeIfAbsent(cat, k -> new Object[]{BigDecimal.ZERO, 0});
+                BigDecimal prev = (BigDecimal) categoryMap.get(cat)[0];
+                BigDecimal itemAmt = item.getAmount() != null ? item.getAmount() : BigDecimal.ZERO;
+                categoryMap.get(cat)[0] = prev.add(itemAmt);
+                categoryMap.get(cat)[1] = ((int) categoryMap.get(cat)[1]) + 1;
             }
         }
         var byCategory = categoryMap.entrySet().stream()
                 .map(e -> com.example.demo.dto.StatsResponse.CategoryStat.builder()
                         .category(e.getKey())
-                        .amount(e.getValue()[0])
+                        .amount((BigDecimal) e.getValue()[0])
                         .count((int) e.getValue()[1])
                         .build())
-                .sorted((a, b) -> Double.compare(b.getAmount(), a.getAmount()))
+                .sorted((a, b) -> b.getAmount().compareTo(a.getAmount()))
                 .toList();
 
         // By month (based on createdAt)
-        var monthMap = new java.util.TreeMap<String, double[]>();
+        var monthMap = new java.util.TreeMap<String, Object[]>();
         for (var r : all) {
             if (r.getCreatedAt() == null) continue;
             String month = r.getCreatedAt().toLocalDate().withDayOfMonth(1).toString().substring(0, 7);
-            monthMap.computeIfAbsent(month, k -> new double[2]);
-            monthMap.get(month)[0] += r.getTotalAmount();
-            monthMap.get(month)[1] += 1;
+            monthMap.computeIfAbsent(month, k -> new Object[]{BigDecimal.ZERO, 0});
+            BigDecimal prev = (BigDecimal) monthMap.get(month)[0];
+            BigDecimal rAmt = r.getTotalAmount() != null ? r.getTotalAmount() : BigDecimal.ZERO;
+            monthMap.get(month)[0] = prev.add(rAmt);
+            monthMap.get(month)[1] = ((int) monthMap.get(month)[1]) + 1;
         }
         var byMonth = monthMap.entrySet().stream()
                 .map(e -> com.example.demo.dto.StatsResponse.MonthStat.builder()
                         .month(e.getKey())
-                        .amount(e.getValue()[0])
+                        .amount((BigDecimal) e.getValue()[0])
                         .count((int) e.getValue()[1])
                         .build())
                 .toList();
@@ -348,6 +356,7 @@ public class ExpenseReportService {
                 .returnDate(r.getReturnDate())
                 .createdAt(r.getCreatedAt())
                 .approvedAt(r.getApprovedAt())
+                .rejectedAt(r.getRejectedAt())
                 .submitterId(r.getSubmitter() != null ? r.getSubmitter().getId() : null)
                 .submitterName(r.getSubmitter() != null ? r.getSubmitter().getName() : null)
                 .approverId(r.getApprover() != null ? r.getApprover().getId() : null)
@@ -444,7 +453,9 @@ public class ExpenseReportService {
             st = ExpenseReportStatus.valueOf(status.trim().toUpperCase());
         }
 
-        var list = expenseReportRepository.search(submitterId, q, st, minTotal, maxTotal);
+        BigDecimal minBD = minTotal != null ? BigDecimal.valueOf(minTotal) : null;
+        BigDecimal maxBD = maxTotal != null ? BigDecimal.valueOf(maxTotal) : null;
+        var list = expenseReportRepository.search(submitterId, q, st, minBD, maxBD);
 
         // Sort in-memory for simplicity (demo scale). Options:
         // - activity_desc: approvedAt/createdAt desc
@@ -456,8 +467,16 @@ public class ExpenseReportService {
                     var bT = b.getApprovedAt() != null ? b.getApprovedAt() : b.getCreatedAt();
                     return bT.compareTo(aT);
                 });
-                case "total_desc" -> list.sort((a, b) -> Double.compare(b.getTotalAmount(), a.getTotalAmount()));
-                case "total_asc" -> list.sort((a, b) -> Double.compare(a.getTotalAmount(), b.getTotalAmount()));
+                case "total_desc" -> list.sort((a, b) -> {
+                    BigDecimal aA = a.getTotalAmount() != null ? a.getTotalAmount() : BigDecimal.ZERO;
+                    BigDecimal bA = b.getTotalAmount() != null ? b.getTotalAmount() : BigDecimal.ZERO;
+                    return bA.compareTo(aA);
+                });
+                case "total_asc" -> list.sort((a, b) -> {
+                    BigDecimal aA = a.getTotalAmount() != null ? a.getTotalAmount() : BigDecimal.ZERO;
+                    BigDecimal bA = b.getTotalAmount() != null ? b.getTotalAmount() : BigDecimal.ZERO;
+                    return aA.compareTo(bA);
+                });
                 default -> {
                 }
             }
@@ -489,10 +508,13 @@ public class ExpenseReportService {
                 .stream()
                 .limit(Math.max(1, Math.min(limit, 20)))
                 .map(r -> {
-                    var last = r.getApprovedAt() != null ? r.getApprovedAt() : r.getCreatedAt();
+                    LocalDateTime last = r.getApprovedAt() != null ? r.getApprovedAt()
+                            : (r.getRejectedAt() != null ? r.getRejectedAt() : r.getCreatedAt());
                     String label;
                     if (r.getApprovedAt() != null) {
-                        label = r.getStatus() == ExpenseReportStatus.APPROVED ? "Approved" : "Rejected";
+                        label = "Approved";
+                    } else if (r.getRejectedAt() != null) {
+                        label = "Rejected";
                     } else {
                         label = "Created";
                     }
@@ -506,6 +528,7 @@ public class ExpenseReportService {
                             .submitterName(r.getSubmitter() != null ? r.getSubmitter().getName() : null)
                             .createdAt(r.getCreatedAt())
                             .approvedAt(r.getApprovedAt())
+                            .rejectedAt(r.getRejectedAt())
                             .lastActivityAt(last)
                             .activityLabel(label)
                             .flagged(flagged)
@@ -547,7 +570,7 @@ public class ExpenseReportService {
         }
 
         report.getItems().clear();
-        double total = 0;
+        BigDecimal total = BigDecimal.ZERO;
         if (req.getItems() != null) {
             for (var itemReq : req.getItems()) {
                 if (itemReq == null) continue;
@@ -559,12 +582,12 @@ public class ExpenseReportService {
                         .build();
                 item.setExpenseReport(report);
                 report.getItems().add(item);
-                total += itemReq.getAmount();
+                total = total.add(itemReq.getAmount() != null ? itemReq.getAmount() : BigDecimal.ZERO);
             }
         }
         // Compute per-diem and add to total
         computePerDiem(report);
-        report.setTotalAmount(total + report.getPerDiemAmount());
+        report.setTotalAmount(total.add(report.getPerDiemAmount() != null ? report.getPerDiemAmount() : BigDecimal.ZERO));
 
         // Enforce meal rule (no duplicate meal entries by date)
         validateNoDuplicateMealDates(report.getItems());
@@ -937,7 +960,7 @@ public class ExpenseReportService {
         String previousStatus = report.getStatus().name();
         report.setStatus(ExpenseReportStatus.REJECTED);
         report.setApprover(approver);
-        report.setApprovedAt(LocalDateTime.now()); // 반려도 처리일자 기록
+        report.setRejectedAt(LocalDateTime.now()); // rejection timestamp (separate from approvedAt)
         report.setApprovalComment(req.getComment());
 
         expenseReportRepository.save(report);

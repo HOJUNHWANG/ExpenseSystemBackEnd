@@ -3,6 +3,7 @@ package com.example.demo.domain;
 import jakarta.persistence.*;
 import lombok.*;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -29,7 +30,8 @@ public class ExpenseReport {
 
     private LocalDateTime createdAt;   // Creation Time
 
-    private double totalAmount;           // Total Amount
+    @Column(precision = 12, scale = 2)
+    private BigDecimal totalAmount;           // Total Amount
 
     @Enumerated(EnumType.STRING)
     private ExpenseReportStatus status;             // Status: DRAFT, SUBMITTED, APPROVED etc...
@@ -39,13 +41,20 @@ public class ExpenseReport {
     private LocalDate departureDate;
     private LocalDate returnDate;
 
-    private LocalDateTime approvedAt;
+    private LocalDateTime approvedAt;   // Set only on actual APPROVAL
 
+    private LocalDateTime rejectedAt;   // Set only on REJECTION
+
+    @Column(length = 2000)
     private String approvalComment;
 
     // Per-diem fields
-    private double perDiemAmount;      // Calculated per-diem total
-    private double perDiemRate;        // Daily rate ($25 domestic, $50 international)
+    @Column(precision = 12, scale = 2)
+    private BigDecimal perDiemAmount;      // Calculated per-diem total
+
+    @Column(precision = 5, scale = 2)
+    private BigDecimal perDiemRate;        // Daily rate ($25 domestic, $50 international)
+
     private int perDiemDays;           // Number of days
 
     @ManyToOne(fetch = FetchType.LAZY)

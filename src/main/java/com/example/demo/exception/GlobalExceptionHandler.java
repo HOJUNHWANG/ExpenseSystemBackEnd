@@ -3,6 +3,7 @@ package com.example.demo.exception;
 import jakarta.persistence.EntityNotFoundException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -44,6 +45,20 @@ public class GlobalExceptionHandler {
         return ResponseEntity
                 .status(HttpStatus.NOT_FOUND)
                 .body(ex.getMessage());
+    }
+
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ResponseEntity<String> handleDataIntegrity(DataIntegrityViolationException ex) {
+        String msg = ex.getMostSpecificCause().getMessage();
+        if (msg != null && msg.toLowerCase().contains("unique")) {
+            return ResponseEntity
+                    .status(HttpStatus.CONFLICT)
+                    .body("A record with these details already exists (duplicate value).");
+        }
+        log.error("Data integrity violation", ex);
+        return ResponseEntity
+                .status(HttpStatus.CONFLICT)
+                .body("Data integrity error. Please check your input and try again.");
     }
 
     @ExceptionHandler(Exception.class)

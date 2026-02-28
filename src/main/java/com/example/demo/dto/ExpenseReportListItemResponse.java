@@ -4,6 +4,7 @@ package com.example.demo.dto;
 import lombok.Builder;
 import lombok.Data;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 
 @Data
@@ -12,15 +13,15 @@ public class ExpenseReportListItemResponse {
 
     private Long id;
     private String title;
-    private double totalAmount;
+    private BigDecimal totalAmount;
     private String status;
     private String destination;
     private LocalDate departureDate;
     private LocalDate returnDate;
 
     // Per-diem
-    private double perDiemAmount;
-    private double perDiemRate;
+    private BigDecimal perDiemAmount;
+    private BigDecimal perDiemRate;
     private int perDiemDays;
 
     // Demo policy flags (for list/search UI)

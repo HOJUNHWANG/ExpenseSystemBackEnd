@@ -8,6 +8,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 public interface ExpenseReportRepository extends JpaRepository<ExpenseReport, Long> {
@@ -35,8 +36,8 @@ public interface ExpenseReportRepository extends JpaRepository<ExpenseReport, Lo
             @Param("submitterId") Long submitterId,
             @Param("q") String q,
             @Param("status") ExpenseReportStatus status,
-            @Param("minTotal") Double minTotal,
-            @Param("maxTotal") Double maxTotal
+            @Param("minTotal") BigDecimal minTotal,
+            @Param("maxTotal") BigDecimal maxTotal
     );
 
     @Query("""
@@ -51,15 +52,15 @@ public interface ExpenseReportRepository extends JpaRepository<ExpenseReport, Lo
             @Param("submitterId") Long submitterId,
             @Param("q") String q,
             @Param("status") ExpenseReportStatus status,
-            @Param("minTotal") Double minTotal,
-            @Param("maxTotal") Double maxTotal,
+            @Param("minTotal") BigDecimal minTotal,
+            @Param("maxTotal") BigDecimal maxTotal,
             Pageable pageable
     );
 
     @Query("""
         select r from ExpenseReport r
         where (:submitterId is null or r.submitter.id = :submitterId)
-        order by coalesce(r.approvedAt, r.createdAt) desc
+        order by coalesce(r.approvedAt, r.rejectedAt, r.createdAt) desc
     """)
     List<ExpenseReport> recentActivity(@Param("submitterId") Long submitterId);
 

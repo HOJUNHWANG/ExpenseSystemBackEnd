@@ -16,10 +16,13 @@ public class User {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;          // PK, Auto Increment
 
+    @Column(nullable = false)
     private String name;      // User Name
 
+    @Column(unique = true, nullable = false)
     private String email;     // Company Email
 
+    @Column(nullable = false)
     private String role;      // Role: EMPLOYEE, MANAGER, CFO, CEO etc...
 
     // 나중에 department, status(재직/퇴사 여부) 등도 추가 가능

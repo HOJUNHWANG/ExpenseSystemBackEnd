@@ -3,6 +3,7 @@ package com.example.demo.dto;
 import lombok.Builder;
 import lombok.Data;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 
 @Data
@@ -12,7 +13,7 @@ public class ExpenseItemResponse {
     private Long id;
     private LocalDate date;
     private String description;
-    private double amount;
+    private BigDecimal amount;
     private String category;
 
 }

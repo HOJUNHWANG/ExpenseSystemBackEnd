@@ -6,6 +6,7 @@ import com.example.demo.repository.ExpenseReportRepository;
 import com.example.demo.repository.UserRepository;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -24,6 +25,7 @@ public class DemoDataService {
     private final com.example.demo.repository.SpecialReviewRepository specialReviewRepository;
     private final AuditLogRepository auditLogRepository;
     private final UserRepository userRepository;
+    private final BCryptPasswordEncoder bCryptPasswordEncoder;
 
     @Transactional
     public void resetAndSeed() {
@@ -36,29 +38,35 @@ public class DemoDataService {
         expenseReportRepository.deleteAllInBatch();
         userRepository.deleteAllInBatch();
 
-        // users
+        // users — all share demo password "demo1234"
+        String demoHash = bCryptPasswordEncoder.encode("demo1234");
+
         User employee = userRepository.save(User.builder()
                 .name("Jun Employee")
                 .email("jun@example.com")
                 .role("EMPLOYEE")
+                .password(demoHash)
                 .build());
 
         User manager = userRepository.save(User.builder()
                 .name("Manager Kim")
                 .email("manager@example.com")
                 .role("MANAGER")
+                .password(demoHash)
                 .build());
 
         User cfo = userRepository.save(User.builder()
                 .name("CFO Lee")
                 .email("finance@example.com")
                 .role("CFO")
+                .password(demoHash)
                 .build());
 
         User ceo = userRepository.save(User.builder()
                 .name("CEO Park")
                 .email("ceo@example.com")
                 .role("CEO")
+                .password(demoHash)
                 .build());
 
         // seeded reports (cover every major workflow state)

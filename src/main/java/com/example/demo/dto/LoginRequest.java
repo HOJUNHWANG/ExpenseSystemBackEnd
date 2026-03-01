@@ -11,4 +11,6 @@ public class LoginRequest {
     @Email(message = "Invalid email format")
     private String email;
 
+    private String password;  // Optional for backward compat; demo password is "demo1234"
+
 }

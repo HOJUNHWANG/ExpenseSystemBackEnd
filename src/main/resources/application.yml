@@ -26,3 +26,6 @@ demo:
 app:
   cors:
     allowed-origins: "*"
+  jwt:
+    secret: ${APP_JWT_SECRET:dev-secret-key-change-in-production-ok!}
+    expiration-ms: 86400000

@@ -1,124 +1,130 @@
-# Company Ops Demo (Backend)
+# Expense System — Backend
 
-Spring Boot backend for a public portfolio demo of an internal expense workflow.
+![Spring Boot](https://img.shields.io/badge/Spring_Boot-3.5-6DB33F?logo=springboot)
+![Java](https://img.shields.io/badge/Java-17-ED8B00?logo=openjdk)
+![JWT](https://img.shields.io/badge/JWT-jjwt_0.12-black?logo=jsonwebtokens)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15-4169E1?logo=postgresql)
+![Swagger](https://img.shields.io/badge/Swagger_UI-springdoc-85EA2D?logo=swagger)
 
-This backend is designed for an **open demo**:
-- Seeded accounts
-- Public reset/seed endpoint
-- Demo-friendly auth (login by email)
+Spring Boot REST API for a corporate expense management workflow — JWT-authenticated, multi-role approval chain, and policy enforcement engine.
 
-## Workflow overview (current)
+## API Overview
 
-### Statuses
-- `DRAFT`
-- Normal approval chain:
-  - `MANAGER_REVIEW` → `CFO_REVIEW` → (sometimes) `CEO_REVIEW`
-- Policy exception flow:
-  - `CFO_SPECIAL_REVIEW` / `CEO_SPECIAL_REVIEW` → `CHANGES_REQUESTED`
-- Final:
-  - `APPROVED` / `REJECTED`
+Interactive docs: `http://localhost:8080/swagger-ui.html`
 
-### Submit routing
-When a submitter posts `POST /api/expense-reports/{id}/submit`:
-- If **no policy warnings** remain → routes into the normal approval chain.
-- If **policy warnings exist** → creates/updates an exception review record and routes the report to:
-  - `CFO_SPECIAL_REVIEW` (default)
-  - `CEO_SPECIAL_REVIEW` (when the submitter is CFO)
+| Group | Endpoints |
+|---|---|
+| **Auth** | `POST /api/auth/login` |
+| **Reports** | CRUD + submit + search + pagination |
+| **Approvals** | Approve / reject per role |
+| **Policy exceptions** | Special review decide |
+| **Dashboard** | Stats, recent activity |
+| **Demo** | `POST /api/demo/reset` (re-seed) |
 
-### Exception review (API path kept for compatibility)
-Exception review uses these endpoints:
-- `GET  /api/expense-reports/{id}/special-review`
-- `POST /api/expense-reports/{id}/special-review/decide`
+## Workflow
 
-Rules:
-- Reviewer role must match the review state (CFO vs CEO).
-- If **any item is rejected**:
-  - each rejected item requires `financeReason`
-  - request requires a non-empty `reviewerComment`
-  - report becomes `CHANGES_REQUESTED` (submitter can edit + resubmit)
-- If **all items are approved**:
-  - exception review data is cleared
-  - report routes back into the normal approval chain
+```
+DRAFT
+  │ submit (no warnings)
+  ▼
+MANAGER_REVIEW → CFO_REVIEW → (CEO_REVIEW) → APPROVED
+                                              └─ or REJECTED
 
-## Code quality
-
-### Input validation (Jakarta Validation)
-All `@RequestBody` DTOs are annotated with Jakarta Validation constraints (`@NotNull`, `@NotBlank`, `@NotEmpty`, `@PositiveOrZero`) and validated via `@Valid` in controllers. Invalid requests return a `400 Bad Request` with a field-level error map:
-
-```json
-{ "title": "must not be blank", "items": "must not be empty" }
+  │ submit (policy warnings)
+  ▼
+CFO_SPECIAL_REVIEW / CEO_SPECIAL_REVIEW
+  │ all approved          │ any rejected
+  ▼                       ▼
+normal chain         CHANGES_REQUESTED → re-submit
 ```
 
-### UserRole enum
-Business logic uses a `UserRole` enum (`EMPLOYEE`, `MANAGER`, `CFO`, `CEO`) instead of raw strings, preventing typos and enabling compile-time safety. The `User` entity keeps a `String role` field for DB compatibility; conversion happens at the service layer.
-
-### Error handling
-`GlobalExceptionHandler` provides consistent JSON error responses for:
-- `IllegalArgumentException` → 400
-- `EntityNotFoundException` → 404
-- `MethodArgumentNotValidException` → 400 (field-level errors)
-- Catch-all `Exception` → 500
-
-## Local development
+## Local Development
 
 ### Requirements
-- Java 17
+- Java 17 (JDK)
 
 ### Run
+
 ```bash
+# Windows
+mvnw.cmd spring-boot:run
+
+# macOS / Linux
 ./mvnw spring-boot:run
 ```
 
-Default local config uses H2 (in-memory).
+Default config uses H2 in-memory database.
 H2 console (dev only): `http://localhost:8080/h2-console`
 
-## Public demo endpoints
-- `POST /api/demo/reset` — wipes + seeds demo users and sample reports
-- `POST /api/auth/login` — demo-friendly login by email
+### Run Tests
 
-## Testing
-- API smoke test:
-  ```bash
-  # Local
-  BASE_URL=http://localhost:8080 node scripts/api_smoke.mjs
+```bash
+mvnw.cmd test      # Windows
+./mvnw test        # macOS / Linux
+```
 
-  # Deployed (Render)
-  BASE_URL=https://company-ops-demo-api.onrender.com node scripts/api_smoke.mjs
-  ```
-  > Note: Render may cold-start; the first call can take a bit longer.
+Tests include:
+- **PolicyEngineTest** — 8 pure unit tests (no Spring context)
+- **ExpenseReportServiceTest** — 6 Mockito-based service tests
 
-## Profiles
+## Environment Variables
 
-### `default` (local/dev)
-- H2 in-memory
-- CORS: `*` (demo-friendly)
-- scheduled reset disabled
+| Variable | Default | Required in prod | Description |
+|---|---|---|---|
+| `APP_JWT_SECRET` | `dev-secret-...` | **Yes** | HS256 signing secret (≥ 32 chars) |
+| `SPRING_DATASOURCE_URL` | H2 in-memory | **Yes** | JDBC URL for PostgreSQL |
+| `SPRING_DATASOURCE_USERNAME` | `sa` | **Yes** | DB username |
+| `SPRING_DATASOURCE_PASSWORD` | _(empty)_ | **Yes** | DB password |
+| `APP_CORS_ALLOWED_ORIGINS` | `*` | Recommended | Comma-separated origin allowlist |
+| `DEMO_RESET_ENABLED` | `false` | No | Enable scheduled demo data reset |
+| `DEMO_RESET_CRON` | `0 0 0 * * *` | No | Cron expression for reset schedule |
 
-### `prod` (Render)
-Configured via `application-prod.yml`.
+## Architecture
 
-Required environment variables:
-- `SPRING_PROFILES_ACTIVE=prod`
-- `SPRING_DATASOURCE_URL` (JDBC url)
-- `SPRING_DATASOURCE_USERNAME`
-- `SPRING_DATASOURCE_PASSWORD`
+```
+controller/
+  AuthController       ← /api/auth/login (JWT)
+  ExpenseReportController
+  DemoController
 
-Optional:
-- `APP_CORS_ALLOWED_ORIGINS` (comma-separated allowlist; default `*`)
-- `DEMO_RESET_ENABLED` (default true)
-- `DEMO_RESET_CRON` (default midnight)
-- `DEMO_RESET_ZONE` (default America/New_York)
+service/
+  ExpenseReportService ← business logic, status transitions
+  PolicyEngine         ← stateless rule evaluation
+  DemoDataService      ← seed data
+
+config/
+  JwtUtil              ← HS256 token generation & validation
+  JwtAuthFilter        ← OncePerRequestFilter — reads Bearer token
+  SecurityConfig       ← stateless, CSRF off, permit auth/docs paths
+  WebConfig            ← CORS configuration
+  BusinessConstants    ← policy limits (BigDecimal)
+
+domain/
+  ExpenseReport, ExpenseItem, User, AuditLog, SpecialReview
+```
+
+## Security
+
+- **JWT (jjwt 0.12.6)** — HS256, 24 h TTL, claims: `userId`, `name`, `email`, `role`
+- **BCrypt** — demo password hashed with `BCryptPasswordEncoder`
+- **Stateless** — no server-side sessions; every request is authenticated by token
+- H2 console and Swagger UI are permit-listed (dev only; tighten in prod)
+
+## Demo Accounts
+
+All accounts use password **`demo1234`**.
+
+| Email | Role |
+|---|---|
+| `jun@example.com` | EMPLOYEE |
+| `manager@example.com` | MANAGER |
+| `finance@example.com` | CFO |
+| `ceo@example.com` | CEO |
 
 ## Deployment (Render)
-This repo includes a `Dockerfile`.
 
-Suggested settings:
-- Runtime: Docker
-- Build: (Render will build from Dockerfile)
-- Start: (from Dockerfile)
+Includes a `Dockerfile`. Set the environment variables listed above and deploy.
 
-After deployment:
-- Confirm `POST /api/demo/reset` works
-- Set `APP_CORS_ALLOWED_ORIGINS` to your Vercel URL(s)
+After deployment, call `POST /api/demo/reset` to seed initial data.
 
-> Public demo note: reset endpoint + open CORS are for demo convenience. Tighten these for any real production environment.
+> Public demo note: the reset endpoint and open CORS are for demo convenience. Restrict these for any real production environment.

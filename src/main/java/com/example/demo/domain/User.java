@@ -25,5 +25,6 @@ public class User {
     @Column(nullable = false)
     private String role;      // Role: EMPLOYEE, MANAGER, CFO, CEO etc...
 
-    // 나중에 department, status(재직/퇴사 여부) 등도 추가 가능
+    @Column(length = 60)
+    private String password;  // BCrypt hash; nullable for backward compat
 }

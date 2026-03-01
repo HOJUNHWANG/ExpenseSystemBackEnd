@@ -19,11 +19,12 @@ import assert from "node:assert/strict";
 
 const BASE = process.env.BASE_URL || "http://localhost:8080";
 
-async function http(path, { method = "GET", body, headers } = {}) {
+async function http(path, { method = "GET", body, headers, token } = {}) {
   const res = await fetch(`${BASE}${path}`, {
     method,
     headers: {
       ...(body ? { "Content-Type": "application/json" } : {}),
+      ...(token ? { "Authorization": `Bearer ${token}` } : {}),
       ...(headers || {}),
     },
     body: body ? JSON.stringify(body) : undefined,
@@ -56,6 +57,7 @@ async function login(email) {
   await expectOk(r, `login failed for ${email}`);
   assert.equal(typeof r.data?.id, "number", "login should return numeric id");
   assert.ok(r.data?.role, "login should return role");
+  assert.ok(r.data?.token, "login should return token");
   return r.data;
 }
 
@@ -66,7 +68,7 @@ async function searchAllAs(user) {
     q: "",
     sort: "activity_desc",
   });
-  const r = await http(`/api/expense-reports/search?${qs.toString()}`);
+  const r = await http(`/api/expense-reports/search?${qs.toString()}`, { token: user.token });
   await expectOk(r, "search failed");
   assert.ok(Array.isArray(r.data), "search should return array");
   return r.data;
@@ -79,49 +81,50 @@ function findByTitle(list, title) {
   return r;
 }
 
-async function getReport(id) {
-  const r = await http(`/api/expense-reports/${id}`);
+async function getReport(id, token) {
+  const r = await http(`/api/expense-reports/${id}`, { token });
   await expectOk(r, `get report ${id} failed`);
   return r.data;
 }
 
-async function getSpecialReview(id) {
-  const r = await http(`/api/expense-reports/${id}/special-review`);
+async function getSpecialReview(id, token) {
+  const r = await http(`/api/expense-reports/${id}/special-review`, { token });
   await expectOk(r, `get special review ${id} failed`);
   return r.data;
 }
 
-async function decideSpecialReview(id, payload) {
+async function decideSpecialReview(id, payload, token) {
   const r = await http(`/api/expense-reports/${id}/special-review/decide`, {
     method: "POST",
     body: payload,
+    token,
   });
   return r;
 }
 
-async function submitReport(id, payload) {
-  const r = await http(`/api/expense-reports/${id}/submit`, { method: "POST", body: payload });
+async function submitReport(id, payload, token) {
+  const r = await http(`/api/expense-reports/${id}/submit`, { method: "POST", body: payload, token });
   return r;
 }
 
-async function createReport(payload) {
-  const r = await http("/api/expense-reports", { method: "POST", body: payload });
+async function createReport(payload, token) {
+  const r = await http("/api/expense-reports", { method: "POST", body: payload, token });
   await expectOk(r, "create report failed");
   return r.data;
 }
 
-async function updateReport(id, payload) {
-  const r = await http(`/api/expense-reports/${id}`, { method: "PUT", body: payload });
+async function updateReport(id, payload, token) {
+  const r = await http(`/api/expense-reports/${id}`, { method: "PUT", body: payload, token });
   return r;
 }
 
-async function approveReport(id, payload) {
-  const r = await http(`/api/expense-reports/${id}/approve`, { method: "POST", body: payload });
+async function approveReport(id, payload, token) {
+  const r = await http(`/api/expense-reports/${id}/approve`, { method: "POST", body: payload, token });
   return r;
 }
 
-async function rejectReport(id, payload) {
-  const r = await http(`/api/expense-reports/${id}/reject`, { method: "POST", body: payload });
+async function rejectReport(id, payload, token) {
+  const r = await http(`/api/expense-reports/${id}/reject`, { method: "POST", body: payload, token });
   return r;
 }
 
@@ -149,24 +152,24 @@ async function main() {
 
   // 4) Submit clean DRAFT → MANAGER_REVIEW (normal approval chain entry)
   {
-    const before = await getReport(draftClean.id);
+    const before = await getReport(draftClean.id, employee.token);
     assert.equal(before.status, "DRAFT");
 
-    const s = await submitReport(draftClean.id, { submitterId: employee.id, reasons: [] });
+    const s = await submitReport(draftClean.id, { submitterId: employee.id, reasons: [] }, employee.token);
     await expectOk(s, "submit clean draft failed");
     assert.equal(s.data, "MANAGER_REVIEW");
 
-    const after = await getReport(draftClean.id);
+    const after = await getReport(draftClean.id, manager.token);
     assert.equal(after.status, "MANAGER_REVIEW");
   }
   console.log("[api-smoke] submit clean DRAFT -> MANAGER_REVIEW OK");
 
   // 5) CFO special review reject validations
   {
-    const report = await getReport(financePending.id);
+    const report = await getReport(financePending.id, cfo.token);
     assert.equal(report.status, "CFO_SPECIAL_REVIEW");
 
-    const review = await getSpecialReview(financePending.id);
+    const review = await getSpecialReview(financePending.id, cfo.token);
     assert.equal(review.status, "PENDING");
     assert.ok(review.items?.length >= 1, "special review should have items");
 
@@ -182,7 +185,7 @@ async function main() {
         decision: it.code === first.code ? "REJECT" : "APPROVE",
         financeReason: it.code === first.code ? "" : "OK",
       })),
-    });
+    }, cfo.token);
 
     assert.equal(bad.ok, false);
     assert.equal(bad.status, 400);
@@ -197,19 +200,22 @@ async function main() {
         decision: it.code === first.code ? "REJECT" : "APPROVE",
         financeReason: it.code === first.code ? "Not eligible under policy." : "OK",
       })),
-    });
+    }, cfo.token);
 
     await expectOk(good, "decide special review (reject) failed");
     assert.equal(good.data, "CHANGES_REQUESTED");
 
-    const after = await getReport(financePending.id);
+    const after = await getReport(financePending.id, cfo.token);
     assert.equal(after.status, "CHANGES_REQUESTED");
   }
   console.log("[api-smoke] CFO reject validation OK");
 
   // 6) Existing CHANGES_REQUESTED has feedback visible to submitter
   {
-    const r = await http(`/api/expense-reports/${changesReq.id}/submitter-feedback?requesterId=${employee.id}`);
+    const r = await http(
+      `/api/expense-reports/${changesReq.id}/submitter-feedback?requesterId=${employee.id}`,
+      { token: employee.token }
+    );
     await expectOk(r, "submitter feedback fetch failed");
     assert.equal(r.data?.specialReviewStatus, "REJECTED");
     assert.ok(r.data?.reviewerComment, "feedback should include reviewerComment");
@@ -222,7 +228,7 @@ async function main() {
 
   // 7) Approval queue contains MANAGER_REVIEW report (manager view)
   {
-    const q = await http("/api/expense-reports/pending-approval?requesterRole=MANAGER");
+    const q = await http("/api/expense-reports/pending-approval?requesterRole=MANAGER", { token: manager.token });
     await expectOk(q, "pending approval fetch failed");
     assert.ok(Array.isArray(q.data), "pending-approval should return array");
     assert.ok(
@@ -244,10 +250,10 @@ async function main() {
     const all2 = await searchAllAs(manager2);
     const exceptionReport = findByTitle(all2, "Draft — Hotel Exception (needs Finance)");
 
-    const r0 = await getReport(exceptionReport.id);
+    const r0 = await getReport(exceptionReport.id, cfo2.token);
     assert.equal(r0.status, "CFO_SPECIAL_REVIEW");
 
-    const review = await getSpecialReview(exceptionReport.id);
+    const review = await getSpecialReview(exceptionReport.id, cfo2.token);
     assert.equal(review.status, "PENDING");
     assert.ok(review.items?.length >= 1, "special review should have items");
 
@@ -260,20 +266,23 @@ async function main() {
         decision: "APPROVE",
         financeReason: "OK",
       })),
-    });
+    }, cfo2.token);
     await expectOk(ok, "decide special review (approve) failed");
     assert.equal(ok.data, "MANAGER_REVIEW");
 
-    const r1 = await getReport(exceptionReport.id);
+    const r1 = await getReport(exceptionReport.id, manager2.token);
     assert.equal(r1.status, "MANAGER_REVIEW");
 
     // special review should be deleted on approve
-    const srAfter = await http(`/api/expense-reports/${exceptionReport.id}/special-review`);
+    const srAfter = await http(
+      `/api/expense-reports/${exceptionReport.id}/special-review`,
+      { token: cfo2.token }
+    );
     assert.equal(srAfter.ok, false);
     assert.equal(srAfter.status, 400);
 
     // manager queue should contain the report now
-    const q2 = await http("/api/expense-reports/pending-approval?requesterRole=MANAGER");
+    const q2 = await http("/api/expense-reports/pending-approval?requesterRole=MANAGER", { token: manager2.token });
     await expectOk(q2, "pending approval fetch failed");
     assert.ok(q2.data.some((x) => x.id === exceptionReport.id && x.status === "MANAGER_REVIEW"));
 
@@ -281,15 +290,14 @@ async function main() {
   }
   console.log("[api-smoke] exception review approve path OK");
 
-
-
-  // 8) Full loop: exception reject -> changes requested -> fix -> resubmit -> approve chain
+  // 9) Full loop: exception reject -> changes requested -> fix -> resubmit -> approve chain
   {
     await resetDemo();
 
     const employee2 = await login("jun@example.com");
     const manager2 = await login("manager@example.com");
     const cfo2 = await login("finance@example.com");
+
     // Create an exception report (Hotel cap is 250; set 400 to trigger warning)
     const id = await createReport({
       submitterId: employee2.id,
@@ -297,7 +305,7 @@ async function main() {
       items: [
         { date: "2026-01-10", description: "Hotel night", amount: 400, category: "Hotel" },
       ],
-    });
+    }, employee2.token);
 
     // Set destination and dates via update (CreateRequest doesn't have these fields)
     await updateReport(id, {
@@ -309,13 +317,13 @@ async function main() {
       items: [
         { date: "2026-01-10", description: "Hotel night", amount: 400, category: "Hotel" },
       ],
-    });
+    }, employee2.token);
 
-    const s1 = await submitReport(id, { submitterId: employee2.id, reasons: [] });
+    const s1 = await submitReport(id, { submitterId: employee2.id, reasons: [] }, employee2.token);
     await expectOk(s1, "submit exception report failed");
     assert.equal(s1.data, "CFO_SPECIAL_REVIEW");
 
-    const review = await getSpecialReview(id);
+    const review = await getSpecialReview(id, cfo2.token);
     assert.ok(review.items?.length >= 1);
 
     // CFO rejects (requires per-item reason + overall comment)
@@ -324,7 +332,7 @@ async function main() {
       reviewerRole: "CFO",
       reviewerComment: "Please revise and resubmit.",
       decisions: review.items.map((it) => ({ code: it.code, decision: "REJECT", financeReason: "" })),
-    });
+    }, cfo2.token);
     assert.equal(bad.ok, false);
     assert.equal(bad.status, 400);
 
@@ -333,12 +341,15 @@ async function main() {
       reviewerRole: "CFO",
       reviewerComment: "Please reduce the amount or provide justification.",
       decisions: review.items.map((it) => ({ code: it.code, decision: "REJECT", financeReason: "Over cap." })),
-    });
+    }, cfo2.token);
     await expectOk(good, "decide special review reject failed");
     assert.equal(good.data, "CHANGES_REQUESTED");
 
     // Submitter can fetch feedback
-    const fb = await http(`/api/expense-reports/${id}/submitter-feedback?requesterId=${employee2.id}`);
+    const fb = await http(
+      `/api/expense-reports/${id}/submitter-feedback?requesterId=${employee2.id}`,
+      { token: employee2.token }
+    );
     await expectOk(fb, "submitter feedback fetch failed");
     assert.equal(fb.data?.specialReviewStatus, "REJECTED");
 
@@ -352,22 +363,22 @@ async function main() {
       items: [
         { date: "2026-01-10", description: "Hotel night (fixed)", amount: 240, category: "Hotel" },
       ],
-    });
+    }, employee2.token);
     await expectOk(up, "update changes requested failed");
     assert.equal(up.data, "CHANGES_REQUESTED");
 
-    const s2 = await submitReport(id, { submitterId: employee2.id, reasons: [] });
+    const s2 = await submitReport(id, { submitterId: employee2.id, reasons: [] }, employee2.token);
     await expectOk(s2, "resubmit fixed report failed");
     assert.equal(s2.data, "MANAGER_REVIEW");
 
     // Normal approval chain (employee submitter): manager -> CFO -> APPROVED
-    const a1 = await approveReport(id, { approverId: manager2.id, approverRole: "MANAGER", comment: "OK" });
+    const a1 = await approveReport(id, { approverId: manager2.id, approverRole: "MANAGER", comment: "OK" }, manager2.token);
     await expectOk(a1, "manager approve failed");
-    assert.equal((await getReport(id)).status, "CFO_REVIEW");
+    assert.equal((await getReport(id, manager2.token)).status, "CFO_REVIEW");
 
-    const a2 = await approveReport(id, { approverId: cfo2.id, approverRole: "CFO", comment: "OK" });
+    const a2 = await approveReport(id, { approverId: cfo2.id, approverRole: "CFO", comment: "OK" }, cfo2.token);
     await expectOk(a2, "cfo approve failed");
-    assert.equal((await getReport(id)).status, "APPROVED");
+    assert.equal((await getReport(id, cfo2.token)).status, "APPROVED");
   }
   console.log("[api-smoke] exception loop + approve chain OK");
 

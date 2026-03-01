@@ -1,5 +1,6 @@
 package com.example.demo.service;
 
+import com.example.demo.config.BusinessConstants;
 import com.example.demo.domain.*;
 import com.example.demo.dto.*;
 import com.example.demo.repository.AuditLogRepository;
@@ -113,7 +114,7 @@ public class ExpenseReportService {
         }
         long days = ChronoUnit.DAYS.between(report.getDepartureDate(), report.getReturnDate());
         boolean domestic = isDomestic(report.getDestination());
-        BigDecimal rate = domestic ? new BigDecimal("25.00") : new BigDecimal("50.00");
+        BigDecimal rate = domestic ? BusinessConstants.PER_DIEM_DOMESTIC : BusinessConstants.PER_DIEM_INTERNATIONAL;
         report.setPerDiemDays((int) days);
         report.setPerDiemRate(rate);
         report.setPerDiemAmount(BigDecimal.valueOf(days).multiply(rate));
@@ -226,7 +227,7 @@ public class ExpenseReportService {
         return toPageResponse(result, result.getContent().stream().map(this::toListItem).toList());
     }
 
-    public PageResponse<ExpenseReportListItemResponse> searchReportsPaged(Long requesterId, String requesterRole, String q, String status, Double minTotal, Double maxTotal, String sort, int page, int size) {
+    public PageResponse<ExpenseReportListItemResponse> searchReportsPaged(Long requesterId, String requesterRole, String q, String status, BigDecimal minTotal, BigDecimal maxTotal, String sort, int page, int size) {
         UserRole role = parseRole(requesterRole);
         boolean approver = role == UserRole.MANAGER || role == UserRole.CFO || role == UserRole.CEO;
         Long submitterId = approver ? null : requesterId;
@@ -242,9 +243,7 @@ public class ExpenseReportService {
             default -> Sort.by(Sort.Direction.DESC, "createdAt");
         };
 
-        BigDecimal minBD = minTotal != null ? BigDecimal.valueOf(minTotal) : null;
-        BigDecimal maxBD = maxTotal != null ? BigDecimal.valueOf(maxTotal) : null;
-        var result = expenseReportRepository.searchPaged(submitterId, q, st, minBD, maxBD, PageRequest.of(page, size, jpaSort));
+        var result = expenseReportRepository.searchPaged(submitterId, q, st, minTotal, maxTotal, PageRequest.of(page, size, jpaSort));
         return toPageResponse(result, result.getContent().stream().map(this::toListItem).toList());
     }
 
@@ -442,7 +441,7 @@ public class ExpenseReportService {
      *
      * If requesterRole is not MANAGER/CFO/CEO, results are restricted to requesterId (submitter).
      */
-    public List<ExpenseReportListItemResponse> searchReports(Long requesterId, String requesterRole, String q, String status, Double minTotal, Double maxTotal, String sort) {
+    public List<ExpenseReportListItemResponse> searchReports(Long requesterId, String requesterRole, String q, String status, BigDecimal minTotal, BigDecimal maxTotal, String sort) {
         UserRole role = parseRole(requesterRole);
         boolean approver = role == UserRole.MANAGER || role == UserRole.CFO || role == UserRole.CEO;
 
@@ -453,9 +452,7 @@ public class ExpenseReportService {
             st = ExpenseReportStatus.valueOf(status.trim().toUpperCase());
         }
 
-        BigDecimal minBD = minTotal != null ? BigDecimal.valueOf(minTotal) : null;
-        BigDecimal maxBD = maxTotal != null ? BigDecimal.valueOf(maxTotal) : null;
-        var list = expenseReportRepository.search(submitterId, q, st, minBD, maxBD);
+        var list = expenseReportRepository.search(submitterId, q, st, minTotal, maxTotal);
 
         // Sort in-memory for simplicity (demo scale). Options:
         // - activity_desc: approvedAt/createdAt desc

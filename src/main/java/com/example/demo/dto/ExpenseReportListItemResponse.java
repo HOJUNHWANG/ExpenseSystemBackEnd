@@ -22,7 +22,7 @@ public class ExpenseReportListItemResponse {
     // Per-diem
     private BigDecimal perDiemAmount;
     private BigDecimal perDiemRate;
-    private int perDiemDays;
+    private Integer perDiemDays;
 
     // Demo policy flags (for list/search UI)
     private boolean flagged;

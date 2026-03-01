@@ -16,6 +16,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import com.example.demo.dto.AuditLogResponse;
+import java.math.BigDecimal;
 import java.util.List;
 
 @Tag(name = "Expense Reports", description = "CRUD and workflow operations for expense reports")
@@ -110,8 +111,8 @@ public class ExpenseReportController {
             @RequestParam String requesterRole,
             @RequestParam(required = false) String q,
             @RequestParam(required = false) String status,
-            @RequestParam(required = false) Double minTotal,
-            @RequestParam(required = false) Double maxTotal,
+            @RequestParam(required = false) BigDecimal minTotal,
+            @RequestParam(required = false) BigDecimal maxTotal,
             @RequestParam(required = false, defaultValue = "activity_desc") String sort,
             @RequestParam(required = false) Integer page,
             @RequestParam(required = false, defaultValue = "10") Integer size

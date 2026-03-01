@@ -13,7 +13,7 @@ import java.util.List;
 @Table(name = "expense_reports", indexes = {
         @Index(name = "idx_expense_reports_submitter_id", columnList = "submitter_id"),
         @Index(name = "idx_expense_reports_status", columnList = "status"),
-        @Index(name = "idx_expense_reports_created_at", columnList = "createdAt")
+        @Index(name = "idx_expense_reports_created_at", columnList = "created_at")
 })
 @Getter
 @Setter
@@ -55,7 +55,7 @@ public class ExpenseReport {
     @Column(precision = 5, scale = 2)
     private BigDecimal perDiemRate;        // Daily rate ($25 domestic, $50 international)
 
-    private int perDiemDays;           // Number of days
+    private Integer perDiemDays;        // Number of days (nullable for schema migration compat)
 
     @ManyToOne(fetch = FetchType.LAZY)
     private User submitter;            // Submitter (User)

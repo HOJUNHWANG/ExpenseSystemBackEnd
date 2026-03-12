@@ -8,6 +8,16 @@
 
 Spring Boot REST API for a corporate expense management workflow — JWT-authenticated, multi-role approval chain, and policy enforcement engine.
 
+
+## 🛠 Engineering & Development Process
+
+**AI-Assisted Backend Development**
+To maximize development efficiency, I actively utilized AI code generation tools (e.g., Claude) for boilerplate code and rapid endpoint implementation. This strategic use of AI allowed me to focus my core engineering efforts on higher-level architectural decisions, including:
+- **RESTful API Design:** Structuring clean, decoupled endpoints for client-server communication.
+- **Database Schema Normalization:** Designing robust relational data models for financial records.
+- **Data Integrity & Routing:** Ensuring strict validation and secure routing for transaction data.
+
+
 ## API Overview
 
 Interactive docs: `http://localhost:8080/swagger-ui.html`

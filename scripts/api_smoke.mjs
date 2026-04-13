@@ -53,7 +53,7 @@ async function resetDemo() {
 }
 
 async function login(email) {
-  const r = await http("/api/auth/login", { method: "POST", body: { email } });
+  const r = await http("/api/auth/login", { method: "POST", body: { email, password: "demo1234" } });
   await expectOk(r, `login failed for ${email}`);
   assert.equal(typeof r.data?.id, "number", "login should return numeric id");
   assert.ok(r.data?.role, "login should return role");

@@ -42,17 +42,18 @@ public class ExpenseReportController {
             @RequestParam(required = false) Integer page,
             @RequestParam(required = false, defaultValue = "10") Integer size
     ) {
+        ExpenseReportStatus s = parseStatus(status);
+        int safeSize = clampSize(size);
         if (page != null) {
-            if (status != null && !status.isBlank()) {
-                ExpenseReportStatus s = ExpenseReportStatus.valueOf(status.toUpperCase());
-                return ResponseEntity.ok(expenseReportService.findBySubmitterAndStatusPaged(submitterId, s, page, size));
+            int safePage = Math.max(page, 0);
+            if (s != null) {
+                return ResponseEntity.ok(expenseReportService.findBySubmitterAndStatusPaged(submitterId, s, safePage, safeSize));
             }
-            return ResponseEntity.ok(expenseReportService.getReportsBySubmitterPaged(submitterId, page, size));
+            return ResponseEntity.ok(expenseReportService.getReportsBySubmitterPaged(submitterId, safePage, safeSize));
         }
-        if (status == null || status.isBlank()) {
+        if (s == null) {
             return ResponseEntity.ok(expenseReportService.getReportsBySubmitter(submitterId));
         } else {
-            ExpenseReportStatus s = ExpenseReportStatus.valueOf(status.toUpperCase());
             return ResponseEntity.ok(
                     expenseReportService.findBySubmitterAndStatus(submitterId, s)
             );
@@ -66,8 +67,10 @@ public class ExpenseReportController {
             @RequestParam(required = false) Integer page,
             @RequestParam(required = false, defaultValue = "10") Integer size
     ) {
+        int safeSize = clampSize(size);
         if (page != null) {
-            return ResponseEntity.ok(expenseReportService.getReportsPendingApprovalPaged(requesterRole, page, size));
+            int safePage = Math.max(page, 0);
+            return ResponseEntity.ok(expenseReportService.getReportsPendingApprovalPaged(requesterRole, safePage, safeSize));
         }
         return ResponseEntity.ok(expenseReportService.getReportsPendingApproval(requesterRole));
     }
@@ -117,8 +120,10 @@ public class ExpenseReportController {
             @RequestParam(required = false) Integer page,
             @RequestParam(required = false, defaultValue = "10") Integer size
     ) {
+        int safeSize = clampSize(size);
         if (page != null) {
-            return ResponseEntity.ok(expenseReportService.searchReportsPaged(requesterId, requesterRole, q, status, minTotal, maxTotal, sort, page, size));
+            int safePage = Math.max(page, 0);
+            return ResponseEntity.ok(expenseReportService.searchReportsPaged(requesterId, requesterRole, q, status, minTotal, maxTotal, sort, safePage, safeSize));
         }
         return ResponseEntity.ok(expenseReportService.searchReports(requesterId, requesterRole, q, status, minTotal, maxTotal, sort));
     }
@@ -136,7 +141,8 @@ public class ExpenseReportController {
             @RequestParam String requesterRole,
             @RequestParam(required = false, defaultValue = "10") int limit
     ) {
-        return ResponseEntity.ok(expenseReportService.getRecentActivity(requesterId, requesterRole, limit));
+        int safeLimit = Math.max(1, Math.min(limit, 50));
+        return ResponseEntity.ok(expenseReportService.getRecentActivity(requesterId, requesterRole, safeLimit));
     }
 
     @Operation(summary = "Get audit log", description = "Returns the full change history timeline for a report")
@@ -174,29 +180,37 @@ public class ExpenseReportController {
 
     @Operation(summary = "Approve a report", description = "Advances the report to the next approval stage or marks it as approved")
     @PostMapping("/{id}/approve")
-    public ResponseEntity<?> approve(
+    public ResponseEntity<Void> approve(
             @PathVariable Long id,
             @Valid @RequestBody ApprovalRequest request
     ) {
-        try {
-            expenseReportService.approveReport(id, request);
-            return ResponseEntity.ok().build();
-        } catch (IllegalArgumentException | IllegalStateException e) {
-            return ResponseEntity.badRequest().body(e.getMessage());
-        }
+        expenseReportService.approveReport(id, request);
+        return ResponseEntity.ok().build();
     }
 
     @Operation(summary = "Reject a report", description = "Rejects the report and optionally requests changes from the submitter")
     @PostMapping("/{id}/reject")
-    public ResponseEntity<?> reject(
+    public ResponseEntity<Void> reject(
             @PathVariable Long id,
             @Valid @RequestBody ApprovalRequest request
     ) {
+        expenseReportService.rejectReport(id, request);
+        return ResponseEntity.ok().build();
+    }
+
+    // ── Helpers ──────────────────────────────────────────────────────────────────
+
+    private static ExpenseReportStatus parseStatus(String status) {
+        if (status == null || status.isBlank()) return null;
         try {
-            expenseReportService.rejectReport(id, request);
-            return ResponseEntity.ok().build();
-        } catch (IllegalArgumentException | IllegalStateException e) {
-            return ResponseEntity.badRequest().body(e.getMessage());
+            return ExpenseReportStatus.valueOf(status.toUpperCase());
+        } catch (IllegalArgumentException e) {
+            throw new IllegalArgumentException("Invalid status: " + status);
         }
+    }
+
+    private static int clampSize(Integer size) {
+        if (size == null || size < 1) return 10;
+        return Math.min(size, 100);
     }
 }

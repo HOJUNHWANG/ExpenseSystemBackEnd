@@ -19,6 +19,7 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
+import java.util.Objects;
 
 @Service
 @RequiredArgsConstructor
@@ -861,7 +862,7 @@ public class ExpenseReportService {
         User approver = userRepository.findById(req.getApproverId())
                 .orElseThrow(() -> new IllegalArgumentException("Approver not found: " + req.getApproverId()));
 
-        if (report.getSubmitter().equals(approver)) {
+        if (Objects.equals(report.getSubmitter(), approver)) {
             throw new IllegalStateException("You cannot approve/reject your own report.");
         }
 
@@ -943,7 +944,7 @@ public class ExpenseReportService {
         User approver = userRepository.findById(req.getApproverId())
                 .orElseThrow(() -> new IllegalArgumentException("Approver not found: " + req.getApproverId()));
 
-        if (report.getSubmitter().equals(approver)) {
+        if (Objects.equals(report.getSubmitter(), approver)) {
             throw new IllegalStateException("You cannot approve/reject your own report.");
         }
 

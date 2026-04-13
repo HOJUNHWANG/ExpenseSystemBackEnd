@@ -29,16 +29,15 @@ public class AuthController {
 
         User user = userRepository.findByEmail(request.getEmail()).orElse(null);
 
+        // Use generic message to avoid user-enumeration attacks
         if (user == null) {
-            return ResponseEntity.status(404)
-                    .body("User not found for email: " + request.getEmail());
+            return ResponseEntity.status(401).body("Invalid email or password");
         }
 
-        // Validate password if the user has one stored
-        if (user.getPassword() != null && request.getPassword() != null) {
-            if (!bCryptPasswordEncoder.matches(request.getPassword(), user.getPassword())) {
-                return ResponseEntity.status(401).body("Invalid password");
-            }
+        // Always validate password
+        if (user.getPassword() == null || request.getPassword() == null
+                || !bCryptPasswordEncoder.matches(request.getPassword(), user.getPassword())) {
+            return ResponseEntity.status(401).body("Invalid email or password");
         }
 
         String token = jwtUtil.generateToken(user.getId(), user.getName(), user.getEmail(), user.getRole());

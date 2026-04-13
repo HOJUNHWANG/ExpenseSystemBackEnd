@@ -21,14 +21,16 @@ public class ExpenseItem {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Column(nullable = false)
     private LocalDate date;        // Expense Date
 
-    @Column(length = 500)
+    @Column(length = 500, nullable = false)
     private String description;    // Description
 
-    @Column(precision = 12, scale = 2)
+    @Column(precision = 12, scale = 2, nullable = false)
     private BigDecimal amount;        // Amount
 
+    @Column(nullable = false)
     private String category;       // Category of the expense
 
     @ManyToOne(fetch = FetchType.LAZY)

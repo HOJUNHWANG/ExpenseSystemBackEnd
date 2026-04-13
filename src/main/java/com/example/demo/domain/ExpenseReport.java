@@ -26,8 +26,10 @@ public class ExpenseReport {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Column(nullable = false)
     private String title;              // Report Title
 
+    @Column(nullable = false)
     private LocalDateTime createdAt;   // Creation Time
 
     @Column(precision = 12, scale = 2)
